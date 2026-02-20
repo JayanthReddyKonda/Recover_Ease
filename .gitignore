@@ -21,6 +21,10 @@ dist/
 .vscode/settings.json
 .idea/
 
+# ── Personal docs (not tracked) ─────────────────────
+PROJECT_STATUS.md
+Prompt.txt
+
 # ── OS ──────────────────────────────────────────────
 .DS_Store
 Thumbs.db
