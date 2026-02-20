@@ -1,5 +1,5 @@
 import { useId } from "react";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 
 interface SliderProps {
     label: string;
@@ -33,7 +33,7 @@ export default function Slider({
                 <label htmlFor={id} className="text-sm font-medium text-gray-700">
                     {label}
                 </label>
-                <span className="text-sm font-bold text-primary-600">{value}</span>
+                <span className="min-w-[2rem] rounded-md bg-primary-50 px-2 py-0.5 text-center text-sm font-bold text-primary-600">{value}</span>
             </div>
 
             <input
@@ -44,7 +44,7 @@ export default function Slider({
                 step={step}
                 value={value}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className={clsx("w-full cursor-pointer", colorClass)}
+                className={cn("w-full cursor-pointer rounded-full", colorClass)}
                 style={{
                     background: `linear-gradient(to right, var(--slider-fill, #2563eb) ${pct}%, #e5e7eb ${pct}%)`,
                 }}

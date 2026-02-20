@@ -11,6 +11,7 @@ import Modal from "@/components/Modal";
 import SymptomTrendChart from "@/components/charts/SymptomTrendChart";
 import RiskGauge from "@/components/charts/RiskGauge";
 import MedicationHeatmap from "@/components/charts/MedicationHeatmap";
+import { PageTransition } from "@/components/motion";
 import { useState } from "react";
 import { ArrowLeft, Brain, ShieldAlert, CheckCircle } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -95,194 +96,202 @@ export default function PatientDetailPage() {
     const openEscalations = p.escalations.filter((e) => e.status === "OPEN");
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-3">
-                <Link to="/patients" className="rounded-md p-1 hover:bg-gray-100">
-                    <ArrowLeft className="h-5 w-5" />
-                </Link>
-                <div>
-                    <h1 className="page-heading">{p.user.name}</h1>
-                    <p className="text-sm text-gray-500">
-                        {p.user.email}
-                        {p.user.surgery_type && ` · ${p.user.surgery_type}`}
-                    </p>
+        <PageTransition>
+            <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-4">
+                    <Link to="/patients" className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary-100 to-primary-200 text-primary-600 font-bold text-lg">
+                        {p.user.name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                        <h1 className="page-heading truncate">{p.user.name}</h1>
+                        <p className="text-sm text-gray-500">
+                            {p.user.email}
+                            {p.user.surgery_type && <span className="text-gray-300"> · </span>}
+                            {p.user.surgery_type && <span>{p.user.surgery_type}</span>}
+                        </p>
+                    </div>
                 </div>
-            </div>
 
-            {/* Recovery stage */}
-            {p.recovery_stage && (
-                <Card className="bg-gradient-primary text-white">
-                    <p className="text-xs uppercase tracking-wider opacity-80">Stage</p>
-                    <p className="text-lg font-bold">{p.recovery_stage.name}</p>
-                    <p className="text-sm opacity-90">{p.recovery_stage.description}</p>
-                </Card>
-            )}
+                {/* Recovery stage */}
+                {p.recovery_stage && (
+                    <Card className="border-0 bg-gradient-to-br from-primary-600 to-primary-800 text-white shadow-glow-sm">
+                        <p className="text-xs uppercase tracking-wider text-primary-200">Stage</p>
+                        <p className="text-lg font-bold">{p.recovery_stage.name}</p>
+                        <p className="text-sm text-primary-100">{p.recovery_stage.description}</p>
+                    </Card>
+                )}
 
-            {/* Charts row */}
-            <div className="grid gap-6 lg:grid-cols-2">
+                {/* Charts row */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <Card>
+                        <h2 className="section-heading mb-3">Symptom Trend</h2>
+                        {trendData.length > 0 ? (
+                            <SymptomTrendChart data={trendData} />
+                        ) : (
+                            <p className="py-8 text-center text-sm text-gray-400">No logs yet</p>
+                        )}
+                    </Card>
+
+                    <div className="space-y-6">
+                        <Card>
+                            <h2 className="section-heading mb-3">Escalation Risk</h2>
+                            <RiskGauge data={riskData} />
+                        </Card>
+                        <Card>
+                            <h2 className="section-heading mb-3">Pain Heatmap</h2>
+                            <MedicationHeatmap logs={p.logs} days={28} />
+                        </Card>
+                    </div>
+                </div>
+
+                {/* AI Summary */}
                 <Card>
-                    <h2 className="section-heading mb-3">Symptom Trend</h2>
-                    {trendData.length > 0 ? (
-                        <SymptomTrendChart data={trendData} />
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-100 to-pink-100">
+                            <Brain className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <h2 className="section-heading">AI Summary</h2>
+                    </div>
+                    {aiSummary.isLoading ? (
+                        <Skeleton lines={5} />
+                    ) : aiSummary.data ? (
+                        <div className="space-y-3 text-sm">
+                            <p>{aiSummary.data.overview}</p>
+                            {aiSummary.data.risk_factors.length > 0 && (
+                                <div>
+                                    <p className="font-medium text-red-600">Risk Factors</p>
+                                    <ul className="ml-4 list-disc text-red-500">
+                                        {aiSummary.data.risk_factors.map((r, i) => <li key={i}>{r}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {aiSummary.data.recommendations.length > 0 && (
+                                <div>
+                                    <p className="font-medium text-primary-600">Recommendations</p>
+                                    <ul className="ml-4 list-disc text-gray-600">
+                                        {aiSummary.data.recommendations.map((r, i) => <li key={i}>{r}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-3 gap-3">
+                                {(["improving", "declining", "stable"] as const).map((k) => (
+                                    <div key={k}>
+                                        <p className="text-xs font-medium capitalize text-gray-500">{k}</p>
+                                        {aiSummary.data!.trends[k].length > 0 ? (
+                                            <ul className="mt-1 text-xs text-gray-600">{aiSummary.data!.trends[k].map((t, i) => <li key={i}>{t}</li>)}</ul>
+                                        ) : (
+                                            <p className="text-xs text-gray-300">—</p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     ) : (
-                        <p className="py-8 text-center text-sm text-gray-400">No logs yet</p>
+                        <p className="text-sm text-gray-400">Not enough data for AI summary</p>
                     )}
                 </Card>
 
-                <div className="space-y-6">
+                {/* Open Escalations */}
+                {openEscalations.length > 0 && (
                     <Card>
-                        <h2 className="section-heading mb-3">Escalation Risk</h2>
-                        <RiskGauge data={riskData} />
+                        <div className="flex items-center gap-2 mb-3">
+                            <ShieldAlert className="h-5 w-5 text-red-500" />
+                            <h2 className="section-heading">Open Escalations</h2>
+                        </div>
+                        <ul className="space-y-2">
+                            {openEscalations.map((e) => (
+                                <li key={e.id} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 p-3">
+                                    <div>
+                                        <Badge
+                                            variant={e.severity === "CRITICAL" ? "critical" : e.severity === "HIGH" ? "monitor" : "pending"}
+                                        >
+                                            {e.severity} {e.is_sos && "· SOS"}
+                                        </Badge>
+                                        <p className="mt-1 text-xs text-gray-400">
+                                            {format(parseISO(e.created_at), "MMM d, h:mm a")}
+                                        </p>
+                                    </div>
+                                    <Button size="sm" onClick={() => setReviewTarget(e)}>
+                                        Review
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
                     </Card>
-                    <Card>
-                        <h2 className="section-heading mb-3">Pain Heatmap</h2>
-                        <MedicationHeatmap logs={p.logs} days={28} />
-                    </Card>
-                </div>
-            </div>
+                )}
 
-            {/* AI Summary */}
-            <Card>
-                <div className="flex items-center gap-2 mb-3">
-                    <Brain className="h-5 w-5 text-primary-500" />
-                    <h2 className="section-heading">AI Summary</h2>
-                </div>
-                {aiSummary.isLoading ? (
-                    <Skeleton lines={5} />
-                ) : aiSummary.data ? (
-                    <div className="space-y-3 text-sm">
-                        <p>{aiSummary.data.overview}</p>
-                        {aiSummary.data.risk_factors.length > 0 && (
-                            <div>
-                                <p className="font-medium text-red-600">Risk Factors</p>
-                                <ul className="ml-4 list-disc text-red-500">
-                                    {aiSummary.data.risk_factors.map((r, i) => <li key={i}>{r}</li>)}
-                                </ul>
-                            </div>
-                        )}
-                        {aiSummary.data.recommendations.length > 0 && (
-                            <div>
-                                <p className="font-medium text-primary-600">Recommendations</p>
-                                <ul className="ml-4 list-disc text-gray-600">
-                                    {aiSummary.data.recommendations.map((r, i) => <li key={i}>{r}</li>)}
-                                </ul>
-                            </div>
-                        )}
-                        <div className="grid grid-cols-3 gap-3">
-                            {(["improving", "declining", "stable"] as const).map((k) => (
-                                <div key={k}>
-                                    <p className="text-xs font-medium capitalize text-gray-500">{k}</p>
-                                    {aiSummary.data!.trends[k].length > 0 ? (
-                                        <ul className="mt-1 text-xs text-gray-600">{aiSummary.data!.trends[k].map((t, i) => <li key={i}>{t}</li>)}</ul>
-                                    ) : (
-                                        <p className="text-xs text-gray-300">—</p>
-                                    )}
-                                </div>
+                {/* Milestones */}
+                {p.milestones.length > 0 && (
+                    <Card>
+                        <h2 className="section-heading mb-3">Milestones</h2>
+                        <div className="flex flex-wrap gap-3">
+                            {p.milestones.map((m) => (
+                                <Badge key={m.id} variant="normal" className="text-base">
+                                    {m.icon} {m.title}
+                                </Badge>
                             ))}
                         </div>
-                    </div>
-                ) : (
-                    <p className="text-sm text-gray-400">Not enough data for AI summary</p>
+                    </Card>
                 )}
-            </Card>
 
-            {/* Open Escalations */}
-            {openEscalations.length > 0 && (
-                <Card>
-                    <div className="flex items-center gap-2 mb-3">
-                        <ShieldAlert className="h-5 w-5 text-red-500" />
-                        <h2 className="section-heading">Open Escalations</h2>
-                    </div>
-                    <ul className="space-y-2">
-                        {openEscalations.map((e) => (
-                            <li key={e.id} className="flex items-center justify-between rounded-lg border p-3">
-                                <div>
-                                    <Badge
-                                        variant={e.severity === "CRITICAL" ? "critical" : e.severity === "HIGH" ? "monitor" : "pending"}
-                                    >
-                                        {e.severity} {e.is_sos && "· SOS"}
-                                    </Badge>
-                                    <p className="mt-1 text-xs text-gray-400">
-                                        {format(parseISO(e.created_at), "MMM d, h:mm a")}
-                                    </p>
-                                </div>
-                                <Button size="sm" onClick={() => setReviewTarget(e)}>
-                                    Review
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
-                </Card>
-            )}
-
-            {/* Milestones */}
-            {p.milestones.length > 0 && (
-                <Card>
-                    <h2 className="section-heading mb-3">Milestones</h2>
-                    <div className="flex flex-wrap gap-3">
-                        {p.milestones.map((m) => (
-                            <Badge key={m.id} variant="normal" className="text-base">
-                                {m.icon} {m.title}
+                {/* Review escalation modal */}
+                <Modal
+                    open={!!reviewTarget}
+                    onClose={() => { setReviewTarget(null); setReviewNotes(""); }}
+                    title="Review Escalation"
+                >
+                    {reviewTarget && (
+                        <div className="space-y-4">
+                            <Badge
+                                variant={reviewTarget.severity === "CRITICAL" ? "critical" : "monitor"}
+                            >
+                                {reviewTarget.severity}
                             </Badge>
-                        ))}
-                    </div>
-                </Card>
-            )}
-
-            {/* Review escalation modal */}
-            <Modal
-                open={!!reviewTarget}
-                onClose={() => { setReviewTarget(null); setReviewNotes(""); }}
-                title="Review Escalation"
-            >
-                {reviewTarget && (
-                    <div className="space-y-4">
-                        <Badge
-                            variant={reviewTarget.severity === "CRITICAL" ? "critical" : "monitor"}
-                        >
-                            {reviewTarget.severity}
-                        </Badge>
-                        {reviewTarget.ai_verdict && (
-                            <p className="text-sm text-gray-600">
-                                AI: {reviewTarget.ai_verdict.reasoning}
-                            </p>
-                        )}
-                        <textarea
-                            value={reviewNotes}
-                            onChange={(e) => setReviewNotes(e.target.value)}
-                            placeholder="Doctor notes (optional)"
-                            className="input-base resize-none"
-                            rows={3}
-                        />
-                        <div className="flex gap-2 justify-end">
-                            <Button
-                                variant="outline"
-                                onClick={() =>
-                                    reviewMut.mutate({
-                                        eid: reviewTarget.id,
-                                        data: { status: "ACKNOWLEDGED", notes: reviewNotes || undefined },
-                                    })
-                                }
-                                loading={reviewMut.isPending}
-                            >
-                                Acknowledge
-                            </Button>
-                            <Button
-                                onClick={() =>
-                                    reviewMut.mutate({
-                                        eid: reviewTarget.id,
-                                        data: { status: "RESOLVED", notes: reviewNotes || undefined },
-                                    })
-                                }
-                                loading={reviewMut.isPending}
-                            >
-                                <CheckCircle className="mr-1 h-4 w-4 inline" /> Resolve
-                            </Button>
+                            {reviewTarget.ai_verdict && (
+                                <p className="text-sm text-gray-600">
+                                    AI: {reviewTarget.ai_verdict.reasoning}
+                                </p>
+                            )}
+                            <textarea
+                                value={reviewNotes}
+                                onChange={(e) => setReviewNotes(e.target.value)}
+                                placeholder="Doctor notes (optional)"
+                                className="input-base resize-none"
+                                rows={3}
+                            />
+                            <div className="flex gap-2 justify-end">
+                                <Button
+                                    variant="outline"
+                                    onClick={() =>
+                                        reviewMut.mutate({
+                                            eid: reviewTarget.id,
+                                            data: { status: "ACKNOWLEDGED", notes: reviewNotes || undefined },
+                                        })
+                                    }
+                                    loading={reviewMut.isPending}
+                                >
+                                    Acknowledge
+                                </Button>
+                                <Button
+                                    onClick={() =>
+                                        reviewMut.mutate({
+                                            eid: reviewTarget.id,
+                                            data: { status: "RESOLVED", notes: reviewNotes || undefined },
+                                        })
+                                    }
+                                    loading={reviewMut.isPending}
+                                >
+                                    <CheckCircle className="mr-1 h-4 w-4 inline" /> Resolve
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                )}
-            </Modal>
-        </div>
+                    )}
+                </Modal>
+            </div>
+        </PageTransition>
     );
 }

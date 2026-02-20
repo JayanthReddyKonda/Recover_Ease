@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
     icon: ReactNode;
@@ -19,19 +19,19 @@ export default function MetricCard({
     className,
 }: MetricCardProps) {
     return (
-        <div className={clsx("card flex items-start gap-4", className)}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-500">
+        <div className={cn("card flex items-start gap-4 transition-all duration-200 hover:shadow-card-hover", className)}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/80 text-primary-600">
                 {icon}
             </div>
 
             <div className="min-w-0 flex-1">
                 <p className="metric-label">{label}</p>
-                <p className="metric-value flex items-center gap-1">
+                <p className="metric-value flex items-center gap-1.5">
                     {value}
                     {trend && (
                         <span
-                            className={clsx(
-                                "text-xs",
+                            className={cn(
+                                "text-xs font-semibold",
                                 trend === "up" && "text-emerald-500",
                                 trend === "down" && "text-red-500",
                                 trend === "flat" && "text-gray-400",
@@ -41,7 +41,7 @@ export default function MetricCard({
                         </span>
                     )}
                 </p>
-                {sub && <p className="text-xs text-gray-400">{sub}</p>}
+                {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
             </div>
         </div>
     );

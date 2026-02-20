@@ -1,5 +1,5 @@
 import { type ButtonHTMLAttributes, forwardRef } from "react";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "outline";
 type Size = "sm" | "md" | "lg";
@@ -15,7 +15,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         <button
             ref={ref}
             disabled={disabled || loading}
-            className={clsx(
+            className={cn(
                 "btn",
                 `btn-${size}`,
                 `btn-${variant}`,
@@ -26,7 +26,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         >
             {loading ? (
                 <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     {children}
                 </span>
             ) : (

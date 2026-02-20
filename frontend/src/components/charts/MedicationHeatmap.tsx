@@ -1,6 +1,6 @@
 import type { SymptomLogResponse } from "@/types";
 import { format, parseISO, subDays, eachDayOfInterval } from "date-fns";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 
 interface Props {
     logs: SymptomLogResponse[];
@@ -43,7 +43,7 @@ export default function MedicationHeatmap({ logs, days = 28 }: Props) {
                         <div
                             key={key}
                             title={`${format(d, "MMM d")} – Pain: ${pain ?? "No log"}`}
-                            className={clsx(
+                            className={cn(
                                 "h-5 w-5 rounded-sm transition-colors",
                                 colorForPain(pain),
                             )}
@@ -56,7 +56,7 @@ export default function MedicationHeatmap({ logs, days = 28 }: Props) {
                 <span>Less</span>
                 {["bg-gray-100", "bg-emerald-200", "bg-emerald-400", "bg-amber-300", "bg-orange-400", "bg-red-500"].map(
                     (c) => (
-                        <div key={c} className={clsx("h-3 w-3 rounded-sm", c)} />
+                        <div key={c} className={cn("h-3 w-3 rounded-sm", c)} />
                     ),
                 )}
                 <span>More pain</span>

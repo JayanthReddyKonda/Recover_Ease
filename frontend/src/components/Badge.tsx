@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
 type BadgeVariant =
@@ -21,7 +21,7 @@ export default function Badge({
 }: BadgeProps) {
     return (
         <span
-            className={clsx(
+            className={cn(
                 "badge",
                 variant !== "default" && `badge-${variant}`,
                 className,

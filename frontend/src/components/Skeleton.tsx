@@ -1,4 +1,4 @@
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 
 interface SkeletonProps {
     className?: string;
@@ -8,13 +8,13 @@ interface SkeletonProps {
 export default function Skeleton({ className, lines = 1 }: SkeletonProps) {
     if (lines > 1) {
         return (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2.5">
                 {Array.from({ length: lines }).map((_, i) => (
                     <div
                         key={i}
-                        className={clsx(
-                            "animate-pulse rounded-md bg-gray-200",
-                            i === lines - 1 ? "h-3 w-3/4" : "h-3 w-full",
+                        className={cn(
+                            "h-3 rounded-md bg-gray-100 shimmer",
+                            i === lines - 1 ? "w-3/5" : "w-full",
                             className,
                         )}
                     />
@@ -25,7 +25,7 @@ export default function Skeleton({ className, lines = 1 }: SkeletonProps) {
 
     return (
         <div
-            className={clsx("animate-pulse rounded-md bg-gray-200 h-4", className)}
+            className={cn("h-4 rounded-md bg-gray-100 shimmer", className)}
         />
     );
 }

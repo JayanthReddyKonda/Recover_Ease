@@ -42,5 +42,15 @@ def setup_logging() -> None:
     handler.setLevel(logging.INFO)
     root.addHandler(handler)
 
+    # Suppress noisy /health endpoint from uvicorn access logs
+    class _HealthFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            msg = record.getMessage()
+            return '/health' not in msg
+
+    logging.getLogger('uvicorn.access').addFilter(_HealthFilter())
+    # Silence SQLAlchemy engine echo that leaks through stdlib
+    logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+
 
 logger = structlog.get_logger("recovery_companion")

@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import clsx from "clsx";
+import { cn } from "@/lib/utils";
 
 interface CardProps extends HTMLAttributes<HTMLDivElement> {
     hoverable?: boolean;
@@ -14,7 +14,7 @@ export default function Card({
 }: CardProps) {
     return (
         <div
-            className={clsx(hoverable ? "card-hover" : "card", className)}
+            className={cn(hoverable ? "card-hover" : "card", className)}
             {...props}
         >
             {children}

@@ -10,6 +10,7 @@ import Button from "@/components/Button";
 import Slider from "@/components/Slider";
 import Input from "@/components/Input";
 import Badge from "@/components/Badge";
+import { PageTransition } from "@/components/motion";
 import { Mic, MicOff, Send, CheckCircle } from "lucide-react";
 import type { LogSymptomRequest } from "@/types";
 
@@ -101,117 +102,123 @@ export default function SymptomLogPage() {
     // Already logged today
     if (todayLog.data) {
         return (
-            <div className="mx-auto max-w-lg space-y-6">
-                <Card className="text-center">
-                    <CheckCircle className="mx-auto h-12 w-12 text-emerald-500" />
-                    <h2 className="mt-3 text-lg font-bold">Already Logged Today</h2>
-                    <p className="mt-1 text-sm text-gray-500">
-                        Pain {todayLog.data.pain_level}/10 · Mood {todayLog.data.mood}/10 · Energy {todayLog.data.energy}/10
-                    </p>
-                    {todayLog.data.ai_insight && (
-                        <div className="mt-4 rounded-lg bg-blue-50 p-3 text-left text-sm text-blue-800">
-                            <p className="font-medium">AI Insight</p>
-                            <p className="mt-1">{todayLog.data.ai_insight.summary}</p>
+            <PageTransition>
+                <div className="mx-auto max-w-lg space-y-6">
+                    <Card className="text-center">
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+                            <CheckCircle className="h-7 w-7 text-emerald-500" />
                         </div>
-                    )}
-                </Card>
-            </div>
+                        <h2 className="mt-4 text-lg font-bold text-gray-900">Already Logged Today</h2>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Pain {todayLog.data.pain_level}/10 · Mood {todayLog.data.mood}/10 · Energy {todayLog.data.energy}/10
+                        </p>
+                        {todayLog.data.ai_insight && (
+                            <div className="mt-4 rounded-xl bg-blue-50 p-4 text-left text-sm text-blue-800">
+                                <p className="font-semibold">AI Insight</p>
+                                <p className="mt-1 text-blue-700">{todayLog.data.ai_insight.summary}</p>
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            </PageTransition>
         );
     }
 
     return (
-        <div className="mx-auto max-w-lg space-y-6">
-            <h1 className="page-heading">Log Symptoms</h1>
+        <PageTransition>
+            <div className="mx-auto max-w-lg space-y-6">
+                <h1 className="page-heading">Log Symptoms</h1>
 
-            <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
-                <Card>
-                    <div className="space-y-5">
-                        <Controller
-                            control={control}
-                            name="pain_level"
-                            render={({ field }) => (
-                                <Slider label="Pain Level" value={field.value} onChange={field.onChange} lowLabel="None" highLabel="Severe" />
-                            )}
-                        />
-                        <Controller
-                            control={control}
-                            name="fatigue_level"
-                            render={({ field }) => (
-                                <Slider label="Fatigue" value={field.value} onChange={field.onChange} lowLabel="None" highLabel="Extreme" />
-                            )}
-                        />
-                        <Controller
-                            control={control}
-                            name="mood"
-                            render={({ field }) => (
-                                <Slider label="Mood" value={field.value} onChange={field.onChange} lowLabel="Low" highLabel="Great" />
-                            )}
-                        />
-                        <Controller
-                            control={control}
-                            name="energy"
-                            render={({ field }) => (
-                                <Slider label="Energy" value={field.value} onChange={field.onChange} lowLabel="Drained" highLabel="Energized" />
-                            )}
-                        />
-                        <Controller
-                            control={control}
-                            name="appetite"
-                            render={({ field }) => (
-                                <Slider label="Appetite" value={field.value} onChange={field.onChange} lowLabel="None" highLabel="Strong" />
-                            )}
-                        />
-                        <Controller
-                            control={control}
-                            name="sleep_hours"
-                            render={({ field }) => (
-                                <Slider label="Sleep Hours" value={field.value} onChange={field.onChange} min={0} max={16} step={0.5} lowLabel="0h" highLabel="16h" />
-                            )}
-                        />
-                    </div>
-                </Card>
-
-                <Card>
-                    <Input
-                        label="Temperature (°F, optional)"
-                        type="number"
-                        step="0.1"
-                        placeholder="98.6"
-                        onChange={(e) => setValue("temperature", e.target.value ? Number(e.target.value) : undefined)}
-                    />
-                </Card>
-
-                <Card>
-                    <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-medium text-gray-700">Notes</label>
-                        <button
-                            type="button"
-                            onClick={toggleVoice}
-                            className={`rounded-lg p-2 text-sm ${voiceActive ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                            title="Voice input"
-                        >
-                            {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                        </button>
-                    </div>
-                    {voiceActive && <Badge variant="critical" className="mb-2">Listening…</Badge>}
-                    <Controller
-                        control={control}
-                        name="notes"
-                        render={({ field }) => (
-                            <textarea
-                                {...field}
-                                rows={3}
-                                placeholder="Any additional notes about how you're feeling…"
-                                className="input-base resize-none"
+                <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
+                    <Card>
+                        <div className="space-y-5">
+                            <Controller
+                                control={control}
+                                name="pain_level"
+                                render={({ field }) => (
+                                    <Slider label="Pain Level" value={field.value} onChange={field.onChange} lowLabel="None" highLabel="Severe" />
+                                )}
                             />
-                        )}
-                    />
-                </Card>
+                            <Controller
+                                control={control}
+                                name="fatigue_level"
+                                render={({ field }) => (
+                                    <Slider label="Fatigue" value={field.value} onChange={field.onChange} lowLabel="None" highLabel="Extreme" />
+                                )}
+                            />
+                            <Controller
+                                control={control}
+                                name="mood"
+                                render={({ field }) => (
+                                    <Slider label="Mood" value={field.value} onChange={field.onChange} lowLabel="Low" highLabel="Great" />
+                                )}
+                            />
+                            <Controller
+                                control={control}
+                                name="energy"
+                                render={({ field }) => (
+                                    <Slider label="Energy" value={field.value} onChange={field.onChange} lowLabel="Drained" highLabel="Energized" />
+                                )}
+                            />
+                            <Controller
+                                control={control}
+                                name="appetite"
+                                render={({ field }) => (
+                                    <Slider label="Appetite" value={field.value} onChange={field.onChange} lowLabel="None" highLabel="Strong" />
+                                )}
+                            />
+                            <Controller
+                                control={control}
+                                name="sleep_hours"
+                                render={({ field }) => (
+                                    <Slider label="Sleep Hours" value={field.value} onChange={field.onChange} min={0} max={16} step={0.5} lowLabel="0h" highLabel="16h" />
+                                )}
+                            />
+                        </div>
+                    </Card>
 
-                <Button type="submit" loading={mutation.isPending} className="w-full">
-                    <Send className="mr-1 h-4 w-4 inline" /> Submit Log
-                </Button>
-            </form>
-        </div>
+                    <Card>
+                        <Input
+                            label="Temperature (°F, optional)"
+                            type="number"
+                            step="0.1"
+                            placeholder="98.6"
+                            onChange={(e) => setValue("temperature", e.target.value ? Number(e.target.value) : undefined)}
+                        />
+                    </Card>
+
+                    <Card>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium text-gray-700">Notes</label>
+                            <button
+                                type="button"
+                                onClick={toggleVoice}
+                                className={`rounded-lg p-2 text-sm ${voiceActive ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                                title="Voice input"
+                            >
+                                {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                            </button>
+                        </div>
+                        {voiceActive && <Badge variant="critical" className="mb-2">Listening…</Badge>}
+                        <Controller
+                            control={control}
+                            name="notes"
+                            render={({ field }) => (
+                                <textarea
+                                    {...field}
+                                    rows={3}
+                                    placeholder="Any additional notes about how you're feeling…"
+                                    className="input-base resize-none"
+                                />
+                            )}
+                        />
+                    </Card>
+
+                    <Button type="submit" loading={mutation.isPending} className="w-full">
+                        <Send className="h-4 w-4" /> Submit Log
+                    </Button>
+                </form>
+            </div>
+        </PageTransition>
     );
 }

@@ -31,19 +31,35 @@ export default function SymptomTrendChart({ data }: Props) {
     }));
 
     return (
-        <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={formatted} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="dateLabel" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 12 }} />
+        <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={formatted} margin={{ top: 8, right: 16, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis
+                    dataKey="dateLabel"
+                    tick={{ fontSize: 11, fill: "#9ca3af" }}
+                    axisLine={{ stroke: "#f1f5f9" }}
+                    tickLine={false}
+                />
+                <YAxis
+                    domain={[0, 10]}
+                    tick={{ fontSize: 11, fill: "#9ca3af" }}
+                    axisLine={false}
+                    tickLine={false}
+                />
                 <Tooltip
                     contentStyle={{
-                        borderRadius: "0.5rem",
-                        border: "1px solid #e2e8f0",
+                        borderRadius: "0.75rem",
+                        border: "1px solid #e5e7eb",
                         fontSize: "0.75rem",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                        padding: "8px 12px",
                     }}
                 />
-                <Legend wrapperStyle={{ fontSize: "0.75rem" }} />
+                <Legend
+                    wrapperStyle={{ fontSize: "0.7rem", paddingTop: "8px" }}
+                    iconType="circle"
+                    iconSize={6}
+                />
                 {LINES.map((l) => (
                     <Line
                         key={l.key}
@@ -53,7 +69,7 @@ export default function SymptomTrendChart({ data }: Props) {
                         name={l.label}
                         strokeWidth={2}
                         dot={false}
-                        activeDot={{ r: 4 }}
+                        activeDot={{ r: 3.5, strokeWidth: 2, fill: "#fff" }}
                     />
                 ))}
             </LineChart>
