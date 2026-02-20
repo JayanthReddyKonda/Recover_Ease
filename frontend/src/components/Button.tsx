@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, forwardRef } from "react";
+import { type ButtonHTMLAttributes, type CSSProperties, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "outline";
@@ -10,11 +10,17 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     loading?: boolean;
 }
 
+const VARIANT_STYLES: Partial<Record<Variant, CSSProperties>> = {
+    primary: { backgroundImage: "linear-gradient(to bottom, #6366f1, #4f46e5)" },
+    danger: { backgroundImage: "linear-gradient(to bottom, #f87171, #ef4444)" },
+};
+
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-    ({ variant = "primary", size = "md", loading, className, children, disabled, ...props }, ref) => (
+    ({ variant = "primary", size = "md", loading, className, style, children, disabled, ...props }, ref) => (
         <button
             ref={ref}
             disabled={disabled || loading}
+            style={{ ...VARIANT_STYLES[variant], ...style }}
             className={cn(
                 "btn",
                 `btn-${size}`,

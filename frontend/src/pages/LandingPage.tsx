@@ -68,7 +68,7 @@ export default function LandingPage() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)", boxShadow: "0 0 16px rgb(99 102 241 / 0.4)" }}>
                             <Heart className="h-4 w-4 fill-white text-white" />
                         </div>
-                        Recovery<span className="text-primary-400">.</span>
+                        RecoverEase
                     </Link>
                     <div className="flex items-center gap-3">
                         <Link to="/login">

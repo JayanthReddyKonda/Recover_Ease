@@ -96,16 +96,14 @@
 
     .btn-primary {
         @apply text-white shadow-sm focus-visible:ring-primary-500;
-        background-image: linear-gradient(to bottom, #6366f1, #4f46e5);
     }
 
     .btn-primary:hover {
-        background-image: linear-gradient(to bottom, #818cf8, #4f46e5);
-        box-shadow: 0 0 14px rgb(79 70 229 / 0.35);
+        filter: brightness(1.1);
     }
 
     .btn-primary:active {
-        background-image: linear-gradient(to bottom, #4338ca, #3730a3);
+        filter: brightness(0.9);
     }
 
     .btn-secondary {
@@ -114,16 +112,15 @@
 
     .btn-danger {
         @apply text-white shadow-sm focus-visible:ring-red-500;
-        background-image: linear-gradient(to bottom, #f87171, #ef4444);
     }
 
     .btn-danger:hover {
-        background-image: linear-gradient(to bottom, #fca5a5, #ef4444);
+        filter: brightness(1.1);
         box-shadow: 0 0 28px rgb(220 38 38 / 0.45);
     }
 
     .btn-danger:active {
-        background-image: linear-gradient(to bottom, #dc2626, #b91c1c);
+        filter: brightness(0.9);
     }
 
     .btn-ghost {
