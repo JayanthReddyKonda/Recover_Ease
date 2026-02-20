@@ -14,6 +14,7 @@ class MessageOut(BaseModel):
     content: str
     is_ai: bool
     is_voice: bool
+    audio_url: str | None = None
     created_at: datetime
     sender_name: str | None = None
 

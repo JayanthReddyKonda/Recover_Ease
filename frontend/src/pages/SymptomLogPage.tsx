@@ -11,8 +11,65 @@ import Slider from "@/components/Slider";
 import Input from "@/components/Input";
 import Badge from "@/components/Badge";
 import { PageTransition } from "@/components/motion";
-import { Mic, MicOff, Send, CheckCircle } from "lucide-react";
+import { Mic, MicOff, Send, CheckCircle, Sparkles } from "lucide-react";
 import type { LogSymptomRequest } from "@/types";
+
+// ─── Smart voice command parser ─────────────────────────────
+
+type SymptomField = "pain_level" | "fatigue_level" | "mood" | "sleep_hours" | "appetite" | "energy" | "temperature";
+
+const PATTERNS: [SymptomField, RegExp][] = [
+    ["pain_level", /\b(?:pain|painful|hurting|aching|hurt)(?:\s+(?:is|level|score|at|rating|of|today))?\s+(?:a\s+)?(\d+(?:\.\d+)?)(?:\s+out\s+of\s+\d+)?\b/i],
+    ["fatigue_level", /\b(?:fatigue|fatigued|tired|tiredness|exhausted|exhaustion|weary)(?:\s+(?:is|level|score|at|rating))?\s+(?:a\s+)?(\d+(?:\.\d+)?)(?:\s+out\s+of\s+\d+)?\b/i],
+    ["mood", /\b(?:mood|feeling|emotional|spirit|spirits)(?:\s+(?:is|are|was|at|today|score|rating))?\s+(?:a\s+)?(\d+(?:\.\d+)?)(?:\s+out\s+of\s+\d+)?\b/i],
+    ["sleep_hours", /\b(?:slept|sleep|sleeping|got)\s+(?:about\s+|around\s+|only\s+|just\s+)?(\d+(?:\.\d+)?)\s+(?:hours?|hrs?)(?:\s+of\s+sleep)?\b/i],
+    ["appetite", /\b(?:appetite|hungry|hunger|eating|food)(?:\s+(?:is|was|level|score|at|rating))?\s+(?:a\s+)?(\d+(?:\.\d+)?)(?:\s+out\s+of\s+\d+)?\b/i],
+    ["energy", /\b(?:energy|energetic|stamina|vitality)(?:\s+(?:is|was|level|score|at|today))?\s+(?:a\s+)?(\d+(?:\.\d+)?)(?:\s+out\s+of\s+\d+)?\b/i],
+    ["temperature", /\b(?:temperature|temp|fever)\s+(?:is\s+|of\s+|at\s+)?(\d+(?:\.\d+)?)\s*(?:degrees?|°[FC]?)?\b/i],
+];
+
+const FIELD_LABELS: Record<SymptomField, string> = {
+    pain_level: "Pain",
+    fatigue_level: "Fatigue",
+    mood: "Mood",
+    sleep_hours: "Sleep",
+    appetite: "Appetite",
+    energy: "Energy",
+    temperature: "Temp",
+};
+
+const FIELD_LIMITS: Record<SymptomField, { min: number; max: number }> = {
+    pain_level: { min: 1, max: 10 },
+    fatigue_level: { min: 1, max: 10 },
+    mood: { min: 1, max: 10 },
+    sleep_hours: { min: 0, max: 16 },
+    appetite: { min: 1, max: 10 },
+    energy: { min: 1, max: 10 },
+    temperature: { min: 90, max: 115 },
+};
+
+function parseVoiceCommands(
+    transcript: string,
+): { fields: Partial<Record<SymptomField, number>>; remaining: string } {
+    const fields: Partial<Record<SymptomField, number>> = {};
+    let remaining = transcript;
+
+    for (const [key, regex] of PATTERNS) {
+        const match = remaining.match(regex);
+        if (match) {
+            const val = parseFloat(match[1]);
+            const { min, max } = FIELD_LIMITS[key];
+            if (val >= min && val <= max) {
+                fields[key] = val;
+                remaining = remaining.replace(match[0], "").trim();
+            }
+        }
+    }
+
+    // Normalise leftover whitespace/punctuation
+    remaining = remaining.replace(/[,;.!?]+\s*/g, " ").replace(/\s{2,}/g, " ").trim();
+    return { fields, remaining };
+}
 
 const schema = z.object({
     pain_level: z.number().min(1).max(10),
@@ -31,6 +88,7 @@ export default function SymptomLogPage() {
     const addToast = useStore((s) => s.addToast);
     const qc = useQueryClient();
     const [voiceActive, setVoiceActive] = useState(false);
+    const [voiceFilled, setVoiceFilled] = useState<string[]>([]);
 
     const todayLog = useQuery({
         queryKey: ["today-log"],
@@ -52,7 +110,7 @@ export default function SymptomLogPage() {
 
     const mutation = useMutation({
         mutationFn: (data: LogSymptomRequest) => symptomApi.logSymptom(data),
-        onSuccess: (res) => {
+        onSuccess: () => {
             addToast("success", "Logged!", "Today's symptoms saved");
             qc.invalidateQueries({ queryKey: ["today-log"] });
             qc.invalidateQueries({ queryKey: ["symptom-trend"] });
@@ -62,7 +120,7 @@ export default function SymptomLogPage() {
         onError: (err: Error) => addToast("error", "Failed", err.message),
     });
 
-    // ─── Voice Input (feature-detected) ─────────────────────
+    // ─── Smart Voice Input ───────────────────────────────────────
     function toggleVoice() {
         if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
             addToast("warning", "Not supported", "Speech recognition is not available in this browser");
@@ -84,9 +142,29 @@ export default function SymptomLogPage() {
         recognition.interimResults = false;
 
         recognition.onresult = (event: any) => {
-            const text = event.results[0][0].transcript;
-            const current = watch("notes") || "";
-            setValue("notes", current ? `${current} ${text}` : text);
+            const transcript = event.results[0][0].transcript;
+            const { fields, remaining } = parseVoiceCommands(transcript);
+
+            // Auto-fill matched slider fields
+            const filled: string[] = [];
+            for (const [key, val] of Object.entries(fields) as [SymptomField, number][]) {
+                setValue(key, val, { shouldValidate: true });
+                filled.push(`${FIELD_LABELS[key]} → ${key === "sleep_hours" ? `${val}h` : val}`);
+            }
+
+            // Append any remaining unmatched text to notes
+            if (remaining) {
+                const current = watch("notes") || "";
+                setValue("notes", current ? `${current} ${remaining}` : remaining);
+            }
+
+            if (filled.length > 0) {
+                setVoiceFilled(filled);
+                addToast("success", "Voice filled", filled.join(", "));
+                setTimeout(() => setVoiceFilled([]), 5000);
+            } else if (!remaining) {
+                addToast("info", "Nothing matched", "Try saying \"pain is 7\" or \"I slept 8 hours\"");
+            }
         };
 
         recognition.onerror = () => {
@@ -204,13 +282,42 @@ export default function SymptomLogPage() {
                             <button
                                 type="button"
                                 onClick={toggleVoice}
-                                className={`rounded-lg p-2 text-sm ${voiceActive ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                                title="Voice input"
+                                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${voiceActive ? "bg-red-100 text-red-600" : "bg-primary-50 text-primary-600 hover:bg-primary-100"}`}
+                                title="Smart voice input — say things like 'pain is 7' or 'I slept 8 hours'"
                             >
-                                {voiceActive ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                                {voiceActive ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+                                {voiceActive ? "Stop" : "Smart Voice"}
                             </button>
                         </div>
-                        {voiceActive && <Badge variant="critical" className="mb-2">Listening…</Badge>}
+
+                        {voiceActive && (
+                            <div className="mb-2 flex items-center gap-2 rounded-xl bg-red-50 border border-red-100 px-3 py-2">
+                                <div className="flex gap-0.5 items-end h-4">
+                                    {[2, 4, 3, 5, 2, 4, 3, 4].map((h, i) => (
+                                        <span
+                                            key={i}
+                                            className="w-0.5 rounded-full bg-red-400 animate-bounce"
+                                            style={{ height: `${h * 2}px`, animationDelay: `${i * 0.07}s` }}
+                                        />
+                                    ))}
+                                </div>
+                                <span className="text-xs text-red-600 font-medium">Listening…</span>
+                                <span className="ml-auto text-xs text-red-400">Try: "pain is 7", "slept 6 hours", "mood 4"</span>
+                            </div>
+                        )}
+
+                        {voiceFilled.length > 0 && (
+                            <div className="mb-2 rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Sparkles className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    <span className="text-xs font-medium text-emerald-700">Auto-filled:</span>
+                                    {voiceFilled.map((f, i) => (
+                                        <Badge key={i} variant="normal" className="text-[10px] bg-emerald-100 text-emerald-700">{f}</Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <Controller
                             control={control}
                             name="notes"

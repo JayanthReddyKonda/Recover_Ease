@@ -360,6 +360,7 @@ export interface ChatMessage {
     content: string;
     is_ai: boolean;
     is_voice: boolean;
+    audio_url?: string | null;
     created_at: string;
 }
 

@@ -1,12 +1,11 @@
-"""
-Chat API — doctor-patient real-time messaging and AI conversational chat.
-"""
+"""\nChat API — doctor-patient real-time messaging and AI conversational chat.\n"""
 
 from __future__ import annotations
 
+import base64
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile
 from sqlalchemy import select, or_
 
 from app.api.deps import DbSession
@@ -70,6 +69,7 @@ def _message_to_out(msg: ChatMessage) -> MessageOut:
         content=msg.content,
         is_ai=msg.is_ai,
         is_voice=msg.is_voice,
+        audio_url=msg.audio_url,
         created_at=msg.created_at,
         sender_name=msg.sender.name if msg.sender else ("AI Assistant" if msg.is_ai else None),
     )
@@ -266,6 +266,74 @@ async def send_message(session_id: UUID, body: SendMessageIn, user: CurrentUser,
                 "content": out.content,
                 "is_ai": out.is_ai,
                 "is_voice": out.is_voice,
+                "audio_url": out.audio_url,
+                "created_at": out.created_at.isoformat(),
+            },
+        },
+        room=f"chat:{session_id}",
+        skip_sid=None,
+    )
+
+    return ApiResponse(data=out)
+
+
+# ─────────────────────────────────────────────
+# POST /chat/sessions/{id}/voice-message — send a recorded voice message
+# ─────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/voice-message")
+async def send_voice_message(session_id: UUID, file: UploadFile, user: CurrentUser, db: DbSession):
+    """Accept a WebM/Opus audio upload, transcribe via Groq Whisper, save + broadcast."""
+    session = await _get_session_or_403(db, session_id, user.id)
+    if session.status != ChatSessionStatus.ACTIVE:
+        raise AppError("Session is not active", 400)
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise AppError("Empty audio file", 400)
+
+    # Transcribe
+    try:
+        transcript = await groq_service.transcribe_audio(
+            audio_bytes, file.filename or "voice.webm"
+        )
+    except Exception:
+        raise AppError("Audio transcription failed", 500)
+
+    if not transcript:
+        raise AppError("Could not transcribe audio — please try again", 400)
+
+    # Store audio as base64 data-URL so it plays back without a separate file server
+    mime = file.content_type or "audio/webm"
+    audio_b64 = base64.b64encode(audio_bytes).decode()
+    audio_data_url = f"data:{mime};base64,{audio_b64}"
+
+    msg = ChatMessage(
+        session_id=session_id,
+        sender_id=user.id,
+        content=transcript,
+        is_ai=False,
+        is_voice=True,
+        audio_url=audio_data_url,
+    )
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+
+    out = _message_to_out(msg)
+
+    await sio.emit(
+        "new_message",
+        {
+            "session_id": str(session_id),
+            "message": {
+                "id": str(out.id),
+                "sender_id": str(out.sender_id) if out.sender_id else None,
+                "sender_name": out.sender_name,
+                "content": out.content,
+                "is_ai": out.is_ai,
+                "is_voice": out.is_voice,
+                "audio_url": out.audio_url,
                 "created_at": out.created_at.isoformat(),
             },
         },

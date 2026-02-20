@@ -369,6 +369,8 @@ class ChatMessage(Base):
     is_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # voice_transcript = True if this message came from the voice input feature
     is_voice: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # base64 data-URL of the recorded audio (e.g. "data:audio/webm;base64,...")
+    audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 

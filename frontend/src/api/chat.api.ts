@@ -38,4 +38,15 @@ export const chatApi = {
             content,
             is_voice: isVoice,
         }),
+
+    /** Send a recorded voice message; backend transcribes via Groq Whisper */
+    sendVoiceMessage: (sessionId: string, audioBlob: Blob) => {
+        const form = new FormData();
+        form.append("file", audioBlob, "voice.webm");
+        return api.post<ApiResponse<ChatMessage>>(
+            `/chat/sessions/${sessionId}/voice-message`,
+            form,
+            { headers: { "Content-Type": "multipart/form-data" } },
+        );
+    },
 };

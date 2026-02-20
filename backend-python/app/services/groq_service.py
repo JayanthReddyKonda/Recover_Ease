@@ -262,3 +262,23 @@ async def ai_chat_reply(
 
     return None
 
+
+# ─── Audio transcription ────────────────────────────────────────────────────
+
+async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> str:
+    """
+    Transcribe recorded voice audio using Groq's Whisper-large-v3-turbo model.
+    Returns the transcript text.
+    """
+    import io
+    try:
+        response = await client.audio.transcriptions.create(
+            file=(filename, io.BytesIO(audio_bytes), "audio/webm"),
+            model="whisper-large-v3-turbo",
+            response_format="text",
+        )
+        # response is a plain string when response_format="text"
+        return (response if isinstance(response, str) else str(response)).strip()
+    except Exception as e:
+        logger.error("groq_transcription_error", error=str(e))
+        raise RuntimeError(f"Transcription failed: {e}") from e

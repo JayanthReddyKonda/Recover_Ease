@@ -15,6 +15,7 @@ import {
     Send,
     Mic,
     MicOff,
+    Square,
     X,
     Check,
     MessageSquare,
@@ -100,7 +101,21 @@ function MessageBubble({ msg, isSelf }: { msg: ChatMessage; isSelf: boolean }) {
                                 : undefined
                     }
                 >
-                    {msg.content}
+                    {msg.audio_url ? (
+                        <div className="min-w-[180px] max-w-[260px]">
+                            <audio
+                                src={msg.audio_url}
+                                controls
+                                className="w-full rounded-lg"
+                                style={{ height: "36px", colorScheme: isSelf ? "dark" : "light" }}
+                            />
+                            {msg.content && (
+                                <p className="mt-1.5 text-xs opacity-70 italic leading-relaxed">&#34;{msg.content}&#34;</p>
+                            )}
+                        </div>
+                    ) : (
+                        msg.content
+                    )}
                 </div>
 
                 <span className="text-[10px] text-gray-300 px-1">{formatTime(msg.created_at)}</span>
@@ -215,6 +230,60 @@ function useVoiceInput(onTranscript: (text: string, isFinal: boolean) => void) {
     return { isListening, supported, toggle, stop };
 }
 
+// ─── Voice recorder hook (sends actual audio) ────────────────────
+
+function useVoiceRecorder(onDone: (blob: Blob) => void) {
+    const [isRecording, setIsRecording] = useState(false);
+    const [duration, setDuration] = useState(0);
+    const mediaRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const supported =
+        typeof window !== "undefined" && !!navigator?.mediaDevices?.getUserMedia;
+
+    const start = useCallback(async () => {
+        if (!supported) return;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                ? "audio/webm;codecs=opus"
+                : MediaRecorder.isTypeSupported("audio/webm")
+                    ? "audio/webm"
+                    : "audio/ogg";
+            const mr = new MediaRecorder(stream, { mimeType });
+            chunksRef.current = [];
+            mr.ondataavailable = (e) => {
+                if (e.data.size > 0) chunksRef.current.push(e.data);
+            };
+            mr.onstop = () => {
+                const blob = new Blob(chunksRef.current, { type: mimeType });
+                stream.getTracks().forEach((t) => t.stop());
+                onDone(blob);
+            };
+            mr.start(200);
+            mediaRef.current = mr;
+            setIsRecording(true);
+            setDuration(0);
+            timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
+        } catch {
+            // microphone permission denied or not available
+        }
+    }, [supported, onDone]);
+
+    const stop = useCallback(() => {
+        mediaRef.current?.stop();
+        if (timerRef.current) clearInterval(timerRef.current);
+        setIsRecording(false);
+    }, []);
+
+    // auto-stop at 2 minutes
+    useEffect(() => {
+        if (duration >= 120) stop();
+    }, [duration, stop]);
+
+    return { isRecording, duration, supported, start, stop };
+}
+
 // ─── Chat thread view ────────────────────────────────────
 
 function ChatThread({
@@ -257,6 +326,23 @@ function ChatThread({
         },
         onError: (e: Error) => addToast("error", "Failed", e.message),
     });
+
+    const sendVoiceMsgMut = useMutation({
+        mutationFn: (blob: Blob) => chatApi.sendVoiceMessage(session.id, blob),
+        onSuccess: (res) => {
+            const msg = res.data.data;
+            if (msg) {
+                qc.setQueryData<ChatMessage[]>(["chat-messages", session.id], (old = []) => [
+                    ...old,
+                    msg,
+                ]);
+            }
+            qc.invalidateQueries({ queryKey: ["chat-sessions"] });
+        },
+        onError: (e: Error) => addToast("error", "Voice send failed", e.message),
+    });
+
+    const recorder = useVoiceRecorder((blob) => sendVoiceMsgMut.mutate(blob));
 
     const sendAiMsg = useMutation({
         mutationFn: (content: string) => chatApi.sendAiMessage(session.id, content, voice.isListening),
@@ -502,6 +588,44 @@ function ChatThread({
                 )}
             </AnimatePresence>
 
+            {/* Voice recording indicator */}
+            <AnimatePresence>
+                {recorder.isRecording && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mx-4 mb-2 overflow-hidden"
+                    >
+                        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                            <div className="flex h-2.5 w-2.5 shrink-0">
+                                <span className="h-full w-full rounded-full bg-red-500 animate-ping" />
+                            </div>
+                            <div className="flex gap-0.5 items-end h-5">
+                                {[2, 4, 3, 5, 2, 4, 3, 2, 5, 3].map((h, i) => (
+                                    <span
+                                        key={i}
+                                        className="w-0.5 rounded-full bg-red-400 animate-bounce"
+                                        style={{ height: `${h * 2.5}px`, animationDelay: `${i * 0.06}s`, animationDuration: "0.5s" }}
+                                    />
+                                ))}
+                            </div>
+                            <span className="text-xs text-red-600 font-mono font-semibold">
+                                {Math.floor(recorder.duration / 60)}:{String(recorder.duration % 60).padStart(2, "0")}
+                            </span>
+                            <span className="flex-1 text-xs text-red-500">Recording…</span>
+                            <button
+                                type="button"
+                                onClick={recorder.stop}
+                                className="text-xs font-medium text-red-600 hover:text-red-800 flex items-center gap-1"
+                            >
+                                <Square className="h-3 w-3" /> Send
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Input bar */}
             <div className="border-t border-gray-100 p-3">
                 {session.status === "CLOSED" ? (
@@ -525,7 +649,7 @@ function ChatThread({
                             />
                         </div>
 
-                        {/* Voice button */}
+                        {/* Speech-to-text button (fills text input) */}
                         {voice.supported && (
                             <button
                                 type="button"
@@ -533,12 +657,36 @@ function ChatThread({
                                 className={cn(
                                     "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all",
                                     voice.isListening
-                                        ? "bg-red-500 text-white shadow-md shadow-red-200 scale-105"
+                                        ? "bg-indigo-500 text-white shadow-md shadow-indigo-200 scale-105"
                                         : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                                 )}
-                                title={voice.isListening ? "Stop recording" : "Voice input"}
+                                title={voice.isListening ? "Stop dictation" : "Dictate message"}
                             >
                                 {voice.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                            </button>
+                        )}
+
+                        {/* Voice message recorder button (real audio recording, doctor—patient only) */}
+                        {!isAI && recorder.supported && (
+                            <button
+                                type="button"
+                                onClick={() => recorder.isRecording ? recorder.stop() : recorder.start()}
+                                disabled={sendVoiceMsgMut.isPending}
+                                className={cn(
+                                    "relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all",
+                                    recorder.isRecording
+                                        ? "bg-red-500 text-white shadow-lg shadow-red-200 scale-105"
+                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40"
+                                )}
+                                title={recorder.isRecording ? "Stop & send voice message" : "Record voice message"}
+                            >
+                                {sendVoiceMsgMut.isPending ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                ) : recorder.isRecording ? (
+                                    <Square className="h-3.5 w-3.5" />
+                                ) : (
+                                    <Stethoscope className="h-4 w-4" />
+                                )}
                             </button>
                         )}
 
