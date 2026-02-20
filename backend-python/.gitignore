@@ -5,13 +5,18 @@ venv/
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 *.egg-info/
 dist/
 build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Environment
+# Environment (never commit secrets)
 .env
-.env.docker
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -19,3 +24,7 @@ build/
 
 # Alembic
 alembic/versions/*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
