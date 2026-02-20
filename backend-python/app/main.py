@@ -59,7 +59,8 @@ async def lifespan(app: FastAPI):
     logger.info(
         "app_ready",
         cors=settings.cors_origin,
-        resend_enabled=settings.resend_enabled,
+        smtp_enabled=settings.smtp_enabled,
+        whatsapp_enabled=settings.whatsapp_enabled,
         groq_model=settings.groq_model,
     )
 

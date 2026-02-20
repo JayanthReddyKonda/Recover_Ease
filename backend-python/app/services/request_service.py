@@ -14,24 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.middleware.error_handler import AppError
 from app.models.models import DoctorPatient, DoctorPatientRequest, RequestStatus, Role, User
 from app.schemas.common import DoctorLink, SafeUser
-
-
-"""
-Doctor-patient request service — send, accept, reject, disconnect.
-Only doctors can initiate requests; patients accept/reject.
-"""
-
-from __future__ import annotations
-
-from datetime import datetime
-from uuid import UUID
-
-from sqlalchemy import and_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.middleware.error_handler import AppError
-from app.models.models import DoctorPatient, DoctorPatientRequest, RequestStatus, Role, User
-from app.schemas.common import DoctorLink, SafeUser
 from app.services import groq_service
 
 

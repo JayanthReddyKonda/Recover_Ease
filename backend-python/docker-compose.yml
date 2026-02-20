@@ -53,6 +53,12 @@ services:
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
       RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM: ${RESEND_FROM:-Recovery Companion <onboarding@resend.dev>}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-recovery_companion_whatsapp}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Recovery Companion}
       PORT: 8000
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       NODE_ENV: production
@@ -84,6 +90,20 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - rc_network
+
+  # -- Ngrok (static domain tunnel) --
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: rc_ngrok
+    restart: unless-stopped
+    command: http backend:8000 --url=sun-unupset-pursuingly.ngrok-free.dev --log=stdout
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     depends_on:
       backend:
         condition: service_healthy
