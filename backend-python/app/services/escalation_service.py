@@ -111,9 +111,16 @@ async def run_escalation_check(
     else:
         severity = _max_severity(triggered) if triggered else Severity.HIGH
 
-    # Determine doctor_id from the patient
-    patient = log.patient
-    doctor_id = patient.doctor_id if patient else None
+    # Determine doctor_id — pick the first linked doctor (if any)
+    from app.models.models import DoctorPatient
+    from sqlalchemy import select as _select
+    first_link = None
+    if log.patient_id:
+        link_result = await db.execute(
+            _select(DoctorPatient).where(DoctorPatient.patient_id == log.patient_id).limit(1)
+        )
+        first_link = link_result.scalar_one_or_none()
+    doctor_id = first_link.doctor_id if first_link else None
 
     escalation = Escalation(
         patient_id=log.patient_id,

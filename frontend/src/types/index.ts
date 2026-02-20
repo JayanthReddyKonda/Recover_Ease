@@ -26,12 +26,23 @@ export interface SafeUser {
     email: string;
     name: string;
     role: Role;
+    connect_code: string;
     surgery_date: string | null;
     surgery_type: string | null;
     caregiver_email: string | null;
-    doctor_id: string | null;
     created_at: string;
     updated_at: string;
+}
+
+// Doctor-patient link (junction table row)
+export interface DoctorLink {
+    link_id: string;
+    doctor_id: string;
+    patient_id: string;
+    specialty: string | null;
+    created_at: string;
+    doctor: SafeUser | null;
+    patient: SafeUser | null;
 }
 
 // ─── Auth ──────────────────────────────────────────────
@@ -114,7 +125,9 @@ export interface SymptomSummary {
 // ─── Requests ──────────────────────────────────────────
 
 export interface SendRequestBody {
-    to_email: string;
+    to_email?: string;
+    connect_code?: string;
+    specialty?: string;
 }
 
 export interface RequestResponse {

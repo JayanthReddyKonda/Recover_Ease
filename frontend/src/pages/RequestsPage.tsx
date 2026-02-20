@@ -9,13 +9,17 @@ import Badge from "@/components/Badge";
 import Skeleton from "@/components/Skeleton";
 import { PageTransition } from "@/components/motion";
 import { useState } from "react";
-import { UserPlus, Check, X } from "lucide-react";
+import { UserPlus, Check, X, Mail, Hash } from "lucide-react";
+
+type SendMode = "email" | "code";
 
 export default function RequestsPage() {
     const { user } = useAuth();
     const addToast = useStore((s) => s.addToast);
     const qc = useQueryClient();
+    const [mode, setMode] = useState<SendMode>("email");
     const [email, setEmail] = useState("");
+    const [code, setCode] = useState("");
 
     const pending = useQuery({
         queryKey: ["pending-requests"],
@@ -23,10 +27,17 @@ export default function RequestsPage() {
     });
 
     const sendMut = useMutation({
-        mutationFn: (to_email: string) => requestApi.sendRequest(to_email),
+        mutationFn: () => {
+            if (mode === "code") {
+                return requestApi.sendRequest({ connect_code: code.trim().toUpperCase() });
+            }
+            return requestApi.sendRequest({ to_email: email.trim() });
+        },
         onSuccess: () => {
-            addToast("success", "Request sent", `Sent to ${email}`);
+            const target = mode === "code" ? code.toUpperCase() : email;
+            addToast("success", "Request sent", `Sent to ${target}`);
             setEmail("");
+            setCode("");
             qc.invalidateQueries({ queryKey: ["pending-requests"] });
         },
         onError: (err: Error) => addToast("error", "Failed", err.message),
@@ -38,7 +49,7 @@ export default function RequestsPage() {
             addToast("success", "Accepted", "Connection established");
             qc.invalidateQueries({ queryKey: ["pending-requests"] });
             qc.invalidateQueries({ queryKey: ["my-patients"] });
-            qc.invalidateQueries({ queryKey: ["my-doctor"] });
+            qc.invalidateQueries({ queryKey: ["my-doctors"] });
         },
     });
 
@@ -50,9 +61,9 @@ export default function RequestsPage() {
         },
     });
 
-    // Determine which requests are incoming (addressed to me)
     const incoming = pending.data?.filter((r) => r.to_id === user?.id) ?? [];
     const outgoing = pending.data?.filter((r) => r.from_id === user?.id) ?? [];
+    const canSend = mode === "code" ? code.trim().length === 6 : email.trim().length > 0;
 
     return (
         <PageTransition>
@@ -65,24 +76,68 @@ export default function RequestsPage() {
                         <UserPlus className="mr-1 inline h-4 w-4" />{" "}
                         {user?.role === "PATIENT" ? "Connect with a Doctor" : "Invite a Patient"}
                     </h2>
+
+                    {/* Mode tabs */}
+                    <div className="flex gap-1 rounded-lg bg-gray-100 p-1 mb-3">
+                        <button
+                            type="button"
+                            onClick={() => setMode("email")}
+                            className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${mode === "email"
+                                    ? "bg-white text-primary-700 shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
+                                }`}
+                        >
+                            <Mail className="h-3.5 w-3.5" /> Email
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMode("code")}
+                            className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${mode === "code"
+                                    ? "bg-white text-primary-700 shadow-sm"
+                                    : "text-gray-500 hover:text-gray-700"
+                                }`}
+                        >
+                            <Hash className="h-3.5 w-3.5" /> Connect Code
+                        </button>
+                    </div>
+
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
-                            if (email.trim()) sendMut.mutate(email.trim());
+                            if (canSend) sendMut.mutate();
                         }}
                         className="flex gap-2"
                     >
-                        <Input
-                            placeholder="doctor@example.com"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className="flex-1"
-                        />
-                        <Button type="submit" loading={sendMut.isPending}>
+                        {mode === "email" ? (
+                            <Input
+                                placeholder={
+                                    user?.role === "PATIENT"
+                                        ? "doctor@example.com"
+                                        : "patient@example.com"
+                                }
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="flex-1"
+                            />
+                        ) : (
+                            <Input
+                                placeholder="e.g. A3B9X2"
+                                value={code}
+                                maxLength={6}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                className="flex-1 font-mono tracking-widest uppercase"
+                            />
+                        )}
+                        <Button type="submit" loading={sendMut.isPending} disabled={!canSend}>
                             Send
                         </Button>
                     </form>
+                    {mode === "code" && (
+                        <p className="mt-2 text-xs text-gray-400">
+                            Enter the 6-character code shown on the other person's Profile page.
+                        </p>
+                    )}
                 </Card>
 
                 {/* Incoming */}
@@ -147,3 +202,6 @@ export default function RequestsPage() {
         </PageTransition>
     );
 }
+
+
+

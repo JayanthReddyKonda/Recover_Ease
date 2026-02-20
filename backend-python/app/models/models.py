@@ -1,10 +1,12 @@
 """
-SQLAlchemy ORM models — mirrors the Prisma schema from the Node.js backend.
+SQLAlchemy ORM models.
 """
 
 from __future__ import annotations
 
 import enum
+import random
+import string
 import uuid
 from datetime import datetime, timezone
 
@@ -65,6 +67,11 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _connect_code() -> str:
+    """Generate a unique 6-character alphanumeric connect code."""
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+
 # ── User ────────────────────────────────────────────
 
 class User(Base):
@@ -76,15 +83,15 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[Role] = mapped_column(Enum(Role), nullable=False)
 
+    # Short connect code for easy doctor-patient linking (e.g. "A3B9X2")
+    connect_code: Mapped[str] = mapped_column(
+        String(10), unique=True, nullable=False, default=_connect_code, index=True
+    )
+
     # Patient-specific (nullable for doctors)
     surgery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     surgery_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     caregiver_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
-
-    # Doctor-patient link
-    doctor_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -92,9 +99,6 @@ class User(Base):
     )
 
     # Relationships
-    doctor: Mapped[User | None] = relationship(
-        "User", remote_side="User.id", foreign_keys=[doctor_id], lazy="selectin"
-    )
     symptom_logs: Mapped[list[SymptomLog]] = relationship(
         back_populates="patient", cascade="all, delete-orphan", lazy="selectin"
     )
@@ -106,13 +110,49 @@ class User(Base):
         back_populates="patient", cascade="all, delete-orphan", lazy="selectin"
     )
 
-    # Requests sent by this user
+    # Many-to-many doctor ↔ patient links
+    doctor_links: Mapped[list[DoctorPatient]] = relationship(
+        "DoctorPatient", foreign_keys="DoctorPatient.patient_id",
+        back_populates="patient", lazy="selectin", cascade="all, delete-orphan"
+    )
+    patient_links: Mapped[list[DoctorPatient]] = relationship(
+        "DoctorPatient", foreign_keys="DoctorPatient.doctor_id",
+        back_populates="doctor", lazy="selectin", cascade="all, delete-orphan"
+    )
+
+    # Connection requests
     sent_requests: Mapped[list[DoctorPatientRequest]] = relationship(
         back_populates="from_user", foreign_keys="DoctorPatientRequest.from_id", lazy="selectin"
     )
     received_requests: Mapped[list[DoctorPatientRequest]] = relationship(
         back_populates="to_user", foreign_keys="DoctorPatientRequest.to_id", lazy="selectin"
     )
+
+
+# ── DoctorPatient (junction) ────────────────────────
+
+class DoctorPatient(Base):
+    """Many-to-many link between a doctor and patient. A patient can have multiple doctors."""
+    __tablename__ = "doctor_patient_links"
+    __table_args__ = (
+        UniqueConstraint("doctor_id", "patient_id", name="uq_doctor_patient_link"),
+        Index("ix_dpl_patient", "patient_id"),
+        Index("ix_dpl_doctor", "doctor_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # Optional label — e.g. "Orthopedic Surgery", "Physiotherapy"
+    specialty: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    doctor: Mapped[User] = relationship("User", foreign_keys=[doctor_id], back_populates="patient_links", lazy="selectin")
+    patient: Mapped[User] = relationship("User", foreign_keys=[patient_id], back_populates="doctor_links", lazy="selectin")
 
 
 # ── DoctorPatientRequest ───────────────────────────
@@ -213,6 +253,7 @@ class Escalation(Base):
 
     patient: Mapped[User] = relationship("User", foreign_keys=[patient_id], back_populates="escalations", lazy="selectin")
     symptom_log: Mapped[SymptomLog] = relationship("SymptomLog", back_populates="escalation", lazy="selectin")
+    doctor: Mapped[User | None] = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
 
 
 # ── Milestone ───────────────────────────────────────

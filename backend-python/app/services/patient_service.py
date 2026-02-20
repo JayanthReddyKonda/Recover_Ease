@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.middleware.error_handler import AppError
 from app.models.models import (
+    DoctorPatient,
     Escalation,
     EscalationStatus,
     Milestone,
@@ -27,13 +28,19 @@ from app.services import email_service, escalation_service, groq_service, recove
 
 
 async def _verify_doctor_access(db: AsyncSession, doctor: User, patient_id: UUID) -> User:
-    """Verify the doctor has access to this patient."""
+    """Verify the doctor has access to this patient via the junction table."""
     result = await db.execute(select(User).where(User.id == patient_id))
     patient = result.scalar_one_or_none()
-
     if not patient:
         raise AppError("Patient not found", 404)
-    if patient.doctor_id != doctor.id:
+
+    link_result = await db.execute(
+        select(DoctorPatient).where(
+            DoctorPatient.doctor_id == doctor.id,
+            DoctorPatient.patient_id == patient_id,
+        )
+    )
+    if not link_result.scalar_one_or_none():
         raise AppError("Not your patient", 403)
     return patient
 
@@ -150,12 +157,20 @@ async def trigger_sos(
     await db.refresh(log)
 
     escalation = await escalation_service.run_escalation_check(db, log, is_sos=True)
+
+    # Gather all linked doctors
+    links_result = await db.execute(
+        select(DoctorPatient).where(DoctorPatient.patient_id == patient.id)
+    )
+    links = links_result.scalars().all()
+
+    first_doctor_id = links[0].doctor_id if links else None
+
     if not escalation:
-        # Force create one
         escalation = Escalation(
             patient_id=patient.id,
             symptom_log_id=log.id,
-            doctor_id=patient.doctor_id,
+            doctor_id=first_doctor_id,
             severity=Severity.CRITICAL,
             status=EscalationStatus.OPEN,
             is_sos=True,
@@ -164,30 +179,28 @@ async def trigger_sos(
         await db.flush()
         await db.refresh(escalation)
 
-    # Send emails
-    if patient.doctor_id:
-        doctor_result = await db.execute(select(User).where(User.id == patient.doctor_id))
+    # Notify ALL linked doctors
+    for link in links:
+        doctor_result = await db.execute(select(User).where(User.id == link.doctor_id))
         doctor = doctor_result.scalar_one_or_none()
         if doctor:
             await email_service.send_sos_alert(doctor.email, patient.name, notes)
+            if sio:
+                await sio.emit(
+                    "patient_alert",
+                    {
+                        "type": "sos",
+                        "patient_id": str(patient.id),
+                        "patient_name": patient.name,
+                        "severity": "CRITICAL",
+                        "is_sos": True,
+                    },
+                    room=f"doctor:{link.doctor_id}",
+                )
 
     if patient.caregiver_email:
         await email_service.send_caregiver_alert(
             patient.caregiver_email, patient.name, "CRITICAL", f"SOS: {notes or 'No details'}"
-        )
-
-    # Real-time notification
-    if sio and patient.doctor_id:
-        await sio.emit(
-            "patient_alert",
-            {
-                "type": "sos",
-                "patient_id": str(patient.id),
-                "patient_name": patient.name,
-                "severity": "CRITICAL",
-                "is_sos": True,
-            },
-            room=f"doctor:{patient.doctor_id}",
         )
 
     return escalation

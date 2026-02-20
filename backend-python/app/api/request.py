@@ -6,11 +6,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.api.deps import DbSession
 from app.middleware.auth import CurrentUser, DoctorUser, PatientUser
-from app.schemas.common import ApiResponse, SafeUser
+from app.schemas.common import ApiResponse, DoctorLink, SafeUser
 from app.schemas.request import RequestResponse, SendRequestBody
 from app.services import request_service
 
@@ -19,7 +19,12 @@ router = APIRouter(prefix="/requests", tags=["Requests"])
 
 @router.post("", response_model=ApiResponse[RequestResponse])
 async def send_request(body: SendRequestBody, user: CurrentUser, db: DbSession):
-    req = await request_service.send_request(db, user, body.to_email)
+    req = await request_service.send_request(
+        db, user,
+        to_email=body.to_email,
+        connect_code=body.connect_code,
+        specialty=body.specialty,
+    )
     return ApiResponse(data=RequestResponse.model_validate(req))
 
 
@@ -41,16 +46,28 @@ async def reject_request(request_id: UUID, user: CurrentUser, db: DbSession):
     return ApiResponse(data=RequestResponse.model_validate(req))
 
 
-@router.get("/my-doctor", response_model=ApiResponse[SafeUser | None])
-async def get_my_doctor(patient: PatientUser, db: DbSession):
-    doctor = await request_service.get_my_doctor(db, patient)
-    return ApiResponse(data=doctor)
+@router.get("/my-doctors", response_model=ApiResponse[list[DoctorLink]])
+async def get_my_doctors(patient: PatientUser, db: DbSession):
+    """Return all doctors linked to the current patient."""
+    doctors = await request_service.get_my_doctors(db, patient)
+    return ApiResponse(data=doctors)
 
 
 @router.get("/my-patients", response_model=ApiResponse[list[SafeUser]])
 async def get_my_patients(doctor: DoctorUser, db: DbSession):
     patients = await request_service.get_my_patients(db, doctor)
     return ApiResponse(data=patients)
+
+
+@router.get("/lookup", response_model=ApiResponse[SafeUser])
+async def lookup_by_code(
+    code: str = Query(..., description="6-character connect code"),
+    user: CurrentUser = None,
+    db: DbSession = None,
+):
+    """Look up any user by their connect code (for sending connection requests)."""
+    profile = await request_service.lookup_user_by_code(db, code)
+    return ApiResponse(data=profile)
 
 
 @router.delete("/{other_id}/disconnect")

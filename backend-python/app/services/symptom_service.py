@@ -71,44 +71,45 @@ async def log_symptoms(
 
     # Real-time + email notifications on escalation
     if escalation:
-        from app.models.models import User
+        from app.models.models import DoctorPatient, User
         patient_result = await db.execute(select(User).where(User.id == patient_id))
         patient = patient_result.scalar_one_or_none()
-        if patient and patient.doctor_id:
-            # Send email to doctor
-            doctor_result = await db.execute(
-                select(User).where(User.id == patient.doctor_id)
+        if patient:
+            links_result = await db.execute(
+                select(DoctorPatient).where(DoctorPatient.patient_id == patient_id)
             )
-            doctor = doctor_result.scalar_one_or_none()
-            if doctor:
-                await email_service.send_caregiver_alert(
-                    doctor.email,
-                    patient.name,
-                    escalation.severity.value,
-                    f"Escalation triggered — {escalation.severity.value} severity",
-                )
+            links = links_result.scalars().all()
 
-            # Send email to caregiver
+            # Notify ALL linked doctors
+            for link in links:
+                doctor_result = await db.execute(select(User).where(User.id == link.doctor_id))
+                doctor = doctor_result.scalar_one_or_none()
+                if doctor:
+                    await email_service.send_caregiver_alert(
+                        doctor.email,
+                        patient.name,
+                        escalation.severity.value,
+                        f"Escalation triggered — {escalation.severity.value} severity",
+                    )
+                    if sio:
+                        await sio.emit(
+                            "patient_alert",
+                            {
+                                "type": "escalation",
+                                "patient_id": str(patient_id),
+                                "patient_name": patient.name,
+                                "severity": escalation.severity.value,
+                                "is_sos": escalation.is_sos,
+                            },
+                            room=f"doctor:{link.doctor_id}",
+                        )
+
             if patient.caregiver_email:
                 await email_service.send_caregiver_alert(
                     patient.caregiver_email,
                     patient.name,
                     escalation.severity.value,
                     f"Escalation triggered — {escalation.severity.value} severity",
-                )
-
-            # Socket.io real-time alert
-            if sio:
-                await sio.emit(
-                    "patient_alert",
-                    {
-                        "type": "escalation",
-                        "patient_id": str(patient_id),
-                        "patient_name": patient.name,
-                        "severity": escalation.severity.value,
-                        "is_sos": escalation.is_sos,
-                    },
-                    room=f"doctor:{patient.doctor_id}",
                 )
 
     if sio and new_milestones:

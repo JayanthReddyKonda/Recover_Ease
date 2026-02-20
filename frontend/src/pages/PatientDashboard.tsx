@@ -40,9 +40,9 @@ export default function PatientDashboard() {
         staleTime: 60_000,
     });
 
-    const doctor = useQuery({
-        queryKey: ["my-doctor"],
-        queryFn: () => requestApi.getMyDoctor().then((r) => r.data),
+    const doctors = useQuery({
+        queryKey: ["my-doctors"],
+        queryFn: () => requestApi.getMyDoctors().then((r) => r.data ?? []),
     });
 
     const logs = useQuery({
@@ -115,8 +115,10 @@ export default function PatientDashboard() {
                         <StaggerItem>
                             <MetricCard
                                 icon={<UserCheck className="h-5 w-5" />}
-                                label="Doctor"
-                                value={doctor.data?.name ?? "Not linked"}
+                                label="Doctors"
+                                value={doctors.data && doctors.data.length > 0
+                                    ? doctors.data.map((d) => d.doctor?.name ?? "?").join(", ")
+                                    : "Not linked"}
                             />
                         </StaggerItem>
                     </Stagger>

@@ -14,8 +14,8 @@ import Badge from "@/components/Badge";
 import Modal from "@/components/Modal";
 import { PageTransition } from "@/components/motion";
 import { useState } from "react";
-import { User, Link2, Unlink } from "lucide-react";
-import type { ProfileUpdateRequest } from "@/types";
+import { User, Link2, Unlink, Hash } from "lucide-react";
+import type { DoctorLink, ProfileUpdateRequest } from "@/types";
 
 const profileSchema = z.object({
     name: z.string().min(1),
@@ -31,11 +31,11 @@ export default function ProfilePage() {
     const setUser = useStore((s) => s.setUser);
     const addToast = useStore((s) => s.addToast);
     const qc = useQueryClient();
-    const [showDisconnect, setShowDisconnect] = useState(false);
+    const [disconnectTarget, setDisconnectTarget] = useState<DoctorLink | null>(null);
 
-    const doctor = useQuery({
-        queryKey: ["my-doctor"],
-        queryFn: () => requestApi.getMyDoctor().then((r) => r.data),
+    const doctors = useQuery({
+        queryKey: ["my-doctors"],
+        queryFn: () => requestApi.getMyDoctors().then((r) => r.data ?? []),
         enabled: user?.role === "PATIENT",
     });
 
@@ -67,11 +67,11 @@ export default function ProfilePage() {
     });
 
     const disconnectMut = useMutation({
-        mutationFn: (id: string) => requestApi.disconnect(id),
+        mutationFn: (doctorId: string) => requestApi.disconnect(doctorId),
         onSuccess: () => {
             addToast("info", "Disconnected", "Doctor link removed");
-            qc.invalidateQueries({ queryKey: ["my-doctor"] });
-            setShowDisconnect(false);
+            qc.invalidateQueries({ queryKey: ["my-doctors"] });
+            setDisconnectTarget(null);
         },
     });
 
@@ -93,6 +93,33 @@ export default function ProfilePage() {
                         </Badge>
                     </div>
                 </Card>
+
+                {/* Connect code (for both roles) */}
+                {user?.connect_code && (
+                    <Card>
+                        <h2 className="section-heading mb-2 flex items-center gap-1">
+                            <Hash className="h-4 w-4" /> Your Connect Code
+                        </h2>
+                        <p className="text-xs text-gray-500 mb-3">
+                            Share this code so others can send you connection requests without knowing your email.
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <span className="rounded-xl bg-primary-50 px-5 py-2.5 text-2xl font-mono font-bold tracking-widest text-primary-700 border border-primary-200 select-all">
+                                {user.connect_code}
+                            </span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(user.connect_code);
+                                    addToast("success", "Copied", "Connect code copied to clipboard");
+                                }}
+                            >
+                                Copy
+                            </Button>
+                        </div>
+                    </Card>
+                )}
 
                 {/* Edit form */}
                 <Card>
@@ -127,52 +154,67 @@ export default function ProfilePage() {
                     </form>
                 </Card>
 
-                {/* Doctor link (patient only) */}
+                {/* Linked doctors (patient only) */}
                 {user?.role === "PATIENT" && (
                     <Card>
                         <h2 className="section-heading mb-3">
-                            <Link2 className="mr-1 inline h-4 w-4" /> Linked Doctor
+                            <Link2 className="mr-1 inline h-4 w-4" /> Linked Doctors
                         </h2>
-                        {doctor.isLoading ? (
+                        {doctors.isLoading ? (
                             <Skeleton lines={2} />
-                        ) : doctor.data ? (
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium">{doctor.data.name}</p>
-                                    <p className="text-xs text-gray-400">{doctor.data.email}</p>
-                                </div>
-                                <Button
-                                    variant="danger"
-                                    size="sm"
-                                    onClick={() => setShowDisconnect(true)}
-                                >
-                                    <Unlink className="mr-1 h-3 w-3 inline" /> Disconnect
-                                </Button>
-                            </div>
+                        ) : doctors.data && doctors.data.length > 0 ? (
+                            <ul className="space-y-2">
+                                {doctors.data.map((link) => (
+                                    <li
+                                        key={link.link_id}
+                                        className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 p-3"
+                                    >
+                                        <div>
+                                            <p className="text-sm font-medium">{link.doctor?.name ?? "Unknown"}</p>
+                                            <p className="text-xs text-gray-400">{link.doctor?.email}</p>
+                                            {link.specialty && (
+                                                <Badge variant="normal" className="mt-1 text-xs">
+                                                    {link.specialty}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <Button
+                                            variant="danger"
+                                            size="sm"
+                                            onClick={() => setDisconnectTarget(link)}
+                                        >
+                                            <Unlink className="mr-1 h-3 w-3 inline" /> Disconnect
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
                         ) : (
-                            <p className="text-sm text-gray-400">Not linked to a doctor yet</p>
+                            <p className="text-sm text-gray-400">Not linked to any doctor yet</p>
                         )}
                     </Card>
                 )}
 
                 {/* Disconnect confirmation */}
                 <Modal
-                    open={showDisconnect}
-                    onClose={() => setShowDisconnect(false)}
+                    open={!!disconnectTarget}
+                    onClose={() => setDisconnectTarget(null)}
                     title="Disconnect Doctor?"
                 >
                     <p className="text-sm text-gray-600 mb-4">
-                        This will remove the link between you and your doctor. They will no
-                        longer see your symptom logs or receive alerts.
+                        This will remove the link with <strong>{disconnectTarget?.doctor?.name}</strong>.
+                        They will no longer see your symptom logs or receive alerts.
                     </p>
                     <div className="flex gap-2 justify-end">
-                        <Button variant="ghost" onClick={() => setShowDisconnect(false)}>
+                        <Button variant="ghost" onClick={() => setDisconnectTarget(null)}>
                             Cancel
                         </Button>
                         <Button
                             variant="danger"
                             loading={disconnectMut.isPending}
-                            onClick={() => doctor.data && disconnectMut.mutate(doctor.data.id)}
+                            onClick={() =>
+                                disconnectTarget?.doctor_id &&
+                                disconnectMut.mutate(disconnectTarget.doctor_id)
+                            }
                         >
                             Disconnect
                         </Button>
@@ -182,3 +224,5 @@ export default function ProfilePage() {
         </PageTransition>
     );
 }
+
+

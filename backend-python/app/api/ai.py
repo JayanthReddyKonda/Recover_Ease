@@ -45,13 +45,23 @@ async def get_patient_insight(patient: PatientUser, db: DbSession):
 @router.get("/summary/{patient_id}")
 async def get_doctor_summary(patient_id: UUID, doctor: DoctorUser, db: DbSession):
     """Get AI-generated clinical summary for a specific patient (doctor only)."""
-    # Verify doctor access
+    # Verify doctor access via junction table
     from sqlalchemy import select
-    from app.models.models import User
+    from app.models.models import DoctorPatient, User
 
     result = await db.execute(select(User).where(User.id == patient_id))
     patient = result.scalar_one_or_none()
-    if not patient or patient.doctor_id != doctor.id:
+    if not patient:
+        from app.middleware.error_handler import AppError
+        raise AppError("Patient not found", 404)
+
+    link_result = await db.execute(
+        select(DoctorPatient).where(
+            DoctorPatient.doctor_id == doctor.id,
+            DoctorPatient.patient_id == patient_id,
+        )
+    )
+    if not link_result.scalar_one_or_none():
         from app.middleware.error_handler import AppError
         raise AppError("Not your patient", 403)
 

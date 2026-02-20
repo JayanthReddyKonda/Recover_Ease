@@ -1,10 +1,10 @@
 import api from "./axios";
-import type { ApiResponse, RequestResponse, SafeUser } from "@/types";
+import type { ApiResponse, DoctorLink, RequestResponse, SafeUser } from "@/types";
 
 export const requestApi = {
-    sendRequest: (to_email: string) =>
+    sendRequest: (payload: { to_email?: string; connect_code?: string; specialty?: string }) =>
         api
-            .post<ApiResponse<RequestResponse>>("/requests", { to_email })
+            .post<ApiResponse<RequestResponse>>("/requests", payload)
             .then((r) => r.data),
 
     getPending: () =>
@@ -22,18 +22,26 @@ export const requestApi = {
             .post<ApiResponse<RequestResponse>>(`/requests/${id}/reject`)
             .then((r) => r.data),
 
-    getMyDoctor: () =>
+    /** Patient: get ALL linked doctors */
+    getMyDoctors: () =>
         api
-            .get<ApiResponse<SafeUser | null>>("/requests/my-doctor")
+            .get<ApiResponse<DoctorLink[]>>("/requests/my-doctors")
             .then((r) => r.data),
 
+    /** Doctor: get all linked patients */
     getMyPatients: () =>
         api
             .get<ApiResponse<SafeUser[]>>("/requests/my-patients")
             .then((r) => r.data),
 
-    disconnect: (otherId: string) =>
+    /** Look up a user by their 6-char connect code */
+    lookupByCode: (code: string) =>
         api
-            .delete<ApiResponse<null>>(`/requests/${otherId}/disconnect`)
+            .get<ApiResponse<SafeUser>>(`/requests/lookup?code=${encodeURIComponent(code)}`)
+            .then((r) => r.data),
+
+    disconnect: (doctorId: string) =>
+        api
+            .delete<ApiResponse<null>>(`/requests/${doctorId}/disconnect`)
             .then((r) => r.data),
 };
