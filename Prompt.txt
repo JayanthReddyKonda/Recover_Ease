@@ -1,0 +1,1989 @@
+═══════════════════════════════════════════════════════════════════
+You are a senior full-stack engineer building a production-grade
+medical web application called "Recovery Companion" from scratch.
+Build everything in the exact order specified. Do not skip any step.
+Do not ask questions. Make decisions and build.
+═══════════════════════════════════════════════════════════════════
+
+# WHAT YOU ARE BUILDING
+
+A post-discharge patient recovery monitoring system with:
+- Patients log daily symptoms (voice/text/manual)
+- Doctors monitor patients via intelligent triage dashboard
+- Hybrid AI escalation engine (rules + Groq LLM) alerts doctors only when truly needed
+- Real-time Socket.io alerts
+- Doctor sends connection request to patient by Patient ID
+- Patient accepts/rejects — only then data is shared
+- Production-grade UI with Framer Motion animations
+
+# COMPLETE TECH STACK
+
+Infrastructure:   Docker Desktop (Windows) + Docker Compose
+Backend:          Node.js 20 + Express + TypeScript
+Database:         PostgreSQL 16 + Prisma ORM
+Cache:            Redis 7
+Realtime:         Socket.io
+Auth:             JWT + bcrypt
+AI:               Groq API (Llama 3.1 70B)
+Email:            Nodemailer (Gmail SMTP)
+Frontend:         React 18 + Vite + TypeScript
+Styling:          TailwindCSS + Framer Motion
+Charts:           Recharts
+State:            Zustand + React Query (TanStack)
+Forms:            React Hook Form + Zod
+
+# FOLDER STRUCTURE TO CREATE
+
+recovery-companion/
+├── docker-compose.dev.yml
+├── .env
+├── backend/
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── prisma/
+│   │   └── schema.prisma
+│   └── src/
+│       ├── server.ts
+│       ├── app.ts
+│       ├── config/
+│       │   ├── env.ts
+│       │   ├── prisma.ts
+│       │   └── redis.ts
+│       ├── middleware/
+│       │   ├── auth.ts
+│       │   ├── errorHandler.ts
+│       │   └── rateLimiter.ts
+│       ├── routes/
+│       │   ├── index.ts
+│       │   ├── auth.routes.ts
+│       │   ├── request.routes.ts
+│       │   ├── symptom.routes.ts
+│       │   ├── patient.routes.ts
+│       │   ├── escalation.routes.ts
+│       │   └── ai.routes.ts
+│       ├── controllers/
+│       │   ├── auth.controller.ts
+│       │   ├── request.controller.ts
+│       │   ├── symptom.controller.ts
+│       │   ├── patient.controller.ts
+│       │   ├── escalation.controller.ts
+│       │   └── ai.controller.ts
+│       ├── services/
+│       │   ├── groq.service.ts
+│       │   ├── escalation.service.ts
+│       │   ├── recovery.service.ts
+│       │   └── email.service.ts
+│       ├── socket/
+│       │   └── socket.manager.ts
+│       └── types/
+│           └── index.ts
+└── frontend/
+    ├── Dockerfile
+    ├── nginx.conf
+    ├── package.json
+    ├── tsconfig.json
+    ├── vite.config.ts
+    ├── tailwind.config.ts
+    ├── index.html
+    └── src/
+        ├── main.tsx
+        ├── App.tsx
+        ├── index.css
+        ├── api/
+        │   ├── axios.ts
+        │   ├── auth.api.ts
+        │   ├── request.api.ts
+        │   ├── symptom.api.ts
+        │   ├── patient.api.ts
+        │   └── ai.api.ts
+        ├── store/
+        │   └── useStore.ts
+        ├── hooks/
+        │   ├── useAuth.ts
+        │   └── useSocket.ts
+        ├── components/
+        │   ├── ui/
+        │   │   ├── Button.tsx
+        │   │   ├── Card.tsx
+        │   │   ├── Badge.tsx
+        │   │   ├── Input.tsx
+        │   │   ├── Modal.tsx
+        │   │   ├── Slider.tsx
+        │   │   ├── MetricCard.tsx
+        │   │   ├── Skeleton.tsx
+        │   │   ├── Toast.tsx
+        │   │   └── ToastContainer.tsx
+        │   ├── charts/
+        │   │   ├── SymptomTrendChart.tsx
+        │   │   ├── RiskGauge.tsx
+        │   │   └── MedicationHeatmap.tsx
+        │   └── layout/
+        │       ├── Navbar.tsx
+        │       ├── PatientLayout.tsx
+        │       └── DoctorLayout.tsx
+        └── pages/
+            ├── Login.tsx
+            ├── Register.tsx
+            ├── patient/
+            │   ├── PatientDashboard.tsx
+            │   ├── SymptomLogger.tsx
+            │   ├── TrendView.tsx
+            │   ├── GuidanceView.tsx
+            │   └── PendingRequests.tsx
+            └── doctor/
+                ├── DoctorDashboard.tsx
+                ├── PatientDetail.tsx
+                └── ConnectPatient.tsx
+
+═══════════════════════════════════════════════════
+# PHASE 1: DOCKER SETUP — CREATE THESE FILES FIRST
+═══════════════════════════════════════════════════
+
+## FILE: docker-compose.dev.yml
+
+```yaml
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rc_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: recovery_dev
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d recovery_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: rc_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rc_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+
+## FILE: .env (root)
+
+```
+POSTGRES_DB=recovery_dev
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=admin123
+JWT_SECRET=recovery_companion_jwt_ultra_secret_2026
+JWT_EXPIRES_IN=7d
+GROQ_API_KEY=your_groq_api_key_here
+GMAIL_USER=yourteam@gmail.com
+GMAIL_PASS=your_gmail_app_password
+FRONTEND_URL=http://localhost:5173
+```
+
+## FILE: backend/.env
+
+```
+NODE_ENV=development
+PORT=3001
+DATABASE_URL=postgresql://admin:admin123@localhost:5432/recovery_dev
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=recovery_companion_jwt_ultra_secret_2026
+JWT_EXPIRES_IN=7d
+GROQ_API_KEY=your_groq_api_key_here
+GMAIL_USER=yourteam@gmail.com
+GMAIL_PASS=your_gmail_app_password
+FRONTEND_URL=http://localhost:5173
+```
+
+## FILE: frontend/.env
+
+```
+VITE_API_URL=http://localhost:3001/api
+VITE_SOCKET_URL=http://localhost:3001
+```
+
+## FILE: backend/Dockerfile
+
+```dockerfile
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g typescript ts-node ts-node-dev
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npx prisma generate
+EXPOSE 3001
+CMD ["npm", "run", "dev"]
+```
+
+## FILE: frontend/Dockerfile
+
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+## FILE: frontend/nginx.conf
+
+```nginx
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+    location /api {
+        proxy_pass http://backend:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+    }
+}
+```
+
+═══════════════════════════════════════════════════
+# PHASE 2: BACKEND — BUILD IN THIS EXACT ORDER
+═══════════════════════════════════════════════════
+
+## FILE: backend/package.json
+
+```json
+{
+  "name": "recovery-companion-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "nodemailer": "^6.9.8",
+    "socket.io": "^4.7.2",
+    "uuid": "^9.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/morgan": "^1.9.9",
+    "@types/nodemailer": "^6.4.14",
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.7",
+    "prisma": "^5.8.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}
+```
+
+## FILE: backend/tsconfig.json
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+## FILE: backend/prisma/schema.prisma
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum Severity {
+  CRITICAL
+  MONITOR
+  NORMAL
+}
+
+enum EscalationStatus {
+  ACTIVE
+  REVIEWED
+}
+
+model User {
+  id             String    @id @default(uuid())
+  name           String
+  email          String    @unique
+  password       String
+  role           Role
+  condition      String?
+  dischargeDate  DateTime?
+  caregiverEmail String?
+  medications    String[]  @default([])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sentRequests     DoctorPatientRequest[] @relation("SentRequests")
+  receivedRequests DoctorPatientRequest[] @relation("ReceivedRequests")
+  symptomLogs      SymptomLog[]
+  escalations      Escalation[]
+  milestones       Milestone[]
+  reviewedEscalations Escalation[] @relation("ReviewedBy")
+
+  @@map("users")
+}
+
+model DoctorPatientRequest {
+  id        String        @id @default(uuid())
+  doctor    User          @relation("SentRequests", fields: [doctorId], references: [id], onDelete: Cascade)
+  doctorId  String
+  patient   User          @relation("ReceivedRequests", fields: [patientId], references: [id], onDelete: Cascade)
+  patientId String
+  status    RequestStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([doctorId, patientId])
+  @@map("doctor_patient_requests")
+}
+
+model SymptomLog {
+  id              String   @id @default(uuid())
+  patient         User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId       String
+  logDate         DateTime @db.Date
+  pain            Int?
+  fatigue         Int?
+  swelling        Int?
+  sleepHours      Float?
+  mood            String?
+  appetite        Int?
+  rawInput        String?
+  voiceInput      Boolean  @default(false)
+  medicationTaken Json     @default("{}")
+  createdAt       DateTime @default(now())
+
+  @@unique([patientId, logDate])
+  @@map("symptom_logs")
+}
+
+model Escalation {
+  id             String           @id @default(uuid())
+  patient        User             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId      String
+  rulesTriggered String[]         @default([])
+  aiVerdict      String?
+  aiReason       String?
+  aiConfidence   Int?
+  severity       Severity
+  isSOS          Boolean          @default(false)
+  status         EscalationStatus @default(ACTIVE)
+  reviewedBy     User?            @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reviewedById   String?
+  reviewedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  @@map("escalations")
+}
+
+model Milestone {
+  id           String   @id @default(uuid())
+  patient      User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patientId    String
+  milestoneKey String
+  title        String
+  icon         String
+  achievedAt   DateTime @default(now())
+
+  @@unique([patientId, milestoneKey])
+  @@map("milestones")
+}
+```
+
+## FILE: backend/src/types/index.ts
+
+```typescript
+import { Request } from 'express';
+
+export interface JWTPayload {
+  id: string;
+  email: string;
+  role: 'PATIENT' | 'DOCTOR';
+}
+
+export interface AuthRequest extends Request {
+  user?: JWTPayload;
+}
+
+export interface EscalationResult {
+  escalated: boolean;
+  severity: 'CRITICAL' | 'MONITOR' | 'NORMAL';
+  reason?: string;
+  escalationId?: string;
+}
+
+export interface RuleCheckResult {
+  triggered: boolean;
+  rules: string[];
+  reason: string;
+}
+
+export interface GroqAIResult {
+  verdict: 'ALERT' | 'MONITOR' | 'NORMAL';
+  reason: string;
+  confidence: number;
+}
+
+export interface ParsedSymptoms {
+  pain: number | null;
+  fatigue: number | null;
+  swelling: number | null;
+  sleepHours: number | null;
+  mood: string | null;
+  appetite: number | null;
+}
+
+export interface RecoveryStageInfo {
+  stage: 'ACUTE' | 'SUBACUTE' | 'REHABILITATION';
+  label: string;
+  color: string;
+  daysIn: number;
+  guidance: {
+    title: string;
+    instructions: string[];
+    restrictions: string[];
+    watchFor: string[];
+  };
+}
+```
+
+## FILE: backend/src/config/env.ts
+
+```typescript
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const env = {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT: parseInt(process.env.PORT || '3001'),
+  DATABASE_URL: process.env.DATABASE_URL!,
+  REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  JWT_SECRET: process.env.JWT_SECRET!,
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  GROQ_API_KEY: process.env.GROQ_API_KEY!,
+  GMAIL_USER: process.env.GMAIL_USER,
+  GMAIL_PASS: process.env.GMAIL_PASS,
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
+};
+```
+
+## FILE: backend/src/config/prisma.ts
+
+Create a PrismaClient singleton. Export as default.
+In development mode enable query logging. Connect on first use.
+
+## FILE: backend/src/config/redis.ts
+
+Create Redis client using ioredis connecting to env.REDIS_URL.
+Log connection events. Export client as default.
+
+## FILE: backend/src/middleware/auth.ts
+
+Create verifyToken middleware:
+- Extract Bearer token from Authorization header
+- Verify JWT with env.JWT_SECRET typed as JWTPayload
+- Set req.user on AuthRequest
+- 401 for missing or invalid
+
+Create requireRole(...roles: string[]) factory:
+- Check req.user.role is in allowed roles
+- 403 if not
+
+## FILE: backend/src/middleware/errorHandler.ts
+
+Global Express error handler:
+- Prisma P2002 → 409 Conflict
+- Prisma P2025 → 404 Not Found
+- Zod ZodError → 400 with { errors: fieldErrors }
+- JWT JsonWebTokenError → 401
+- Default → 500
+- Dev mode: include stack trace in response
+- Always log 500 errors
+
+## FILE: backend/src/middleware/rateLimiter.ts
+
+Three limiters using express-rate-limit:
+- apiLimiter: 200 requests / 15 min
+- authLimiter: 10 requests / 15 min
+- groqLimiter: 30 requests / 1 min
+
+## FILE: backend/src/socket/socket.manager.ts
+
+```typescript
+import { Server, Socket } from 'socket.io';
+
+export function initSocket(io: Server): void {
+  io.on('connection', (socket: Socket) => {
+    console.log(`Socket connected: ${socket.id}`);
+
+    socket.on('join_doctor_room', (doctorId: string) => {
+      socket.join(`doctor:${doctorId}`);
+      socket.join('doctor_alerts');
+      socket.data.doctorId = doctorId;
+      console.log(`Doctor ${doctorId} joined rooms`);
+    });
+
+    socket.on('join_patient_room', (patientId: string) => {
+      socket.join(`patient:${patientId}`);
+      socket.data.patientId = patientId;
+      console.log(`Patient ${patientId} joined room`);
+    });
+
+    socket.on('ping', () => socket.emit('pong'));
+
+    socket.on('disconnect', () => {
+      console.log(`Socket disconnected: ${socket.id}`);
+    });
+  });
+}
+```
+
+## FILE: backend/src/services/groq.service.ts
+
+Implement all AI functions using Groq API.
+Base URL: https://api.groq.com/openai/v1/chat/completions
+Model: llama-3.1-70b-versatile
+Auth: Bearer ${env.GROQ_API_KEY}
+
+Implement these 5 functions:
+
+FUNCTION 1 — parseSymptomText(text: string): Promise<ParsedSymptoms>
+System: "You are a precise medical data parser. Extract symptom metrics from patient natural language.
+Return ONLY valid JSON with keys: pain (int 1-10|null), fatigue (int 1-10|null), swelling (int 1-10|null),
+sleepHours (float 0-12|null), mood ('great'|'good'|'okay'|'bad'|'awful'|null), appetite (int 1-10|null).
+No explanation. No markdown. Just the JSON object."
+Strip fences, parse, return typed result.
+
+FUNCTION 2 — runAIEscalationCheck(logs: any[], ruleReason: string): Promise<GroqAIResult>
+System: "You are a clinical pattern analyzer for post-surgical recovery.
+Rule system flagged: [ruleReason]. Independently verify if doctor notification is warranted.
+Return ONLY valid JSON: { verdict: 'ALERT'|'MONITOR'|'NORMAL', reason: 'one clinical sentence', confidence: 0-100 }"
+
+FUNCTION 3 — generatePatientInsight(data: object): Promise<string>
+System: "You are a warm recovery coach. Write exactly 2 sentences of personalized encouragement.
+Reference specific numbers. No jargon. Human and caring tone. Honest but positive."
+
+FUNCTION 4 — generateDoctorSummary(data: object): Promise<string>
+System: "Clinical AI assistant. Write 3-sentence patient summary for their doctor.
+Sentence 1: recovery trajectory with metric trends. Sentence 2: key concern or positive development.
+Sentence 3: one specific recommendation. Precise and clinical."
+
+FUNCTION 5 — generateCaregiverMessage(name: string, pain: number, trend: string): Promise<string>
+System: "One warm sentence for a family member about their loved one's recovery today.
+Max 25 words. Never alarming. Plain language."
+
+Wrap every call in try/catch. Throw descriptive errors.
+
+## FILE: backend/src/services/escalation.service.ts
+
+Import: prisma, groqService, uuid, Server from socket.io
+
+FUNCTION — checkRules(logs: any[]): RuleCheckResult
+
+Input: logs sorted by logDate ASC with medicationTaken parsed from JSON.
+Check ALL rules, collect every triggered one:
+
+RULE IMMEDIATE_SPIKE: any log with pain >= 9
+RULE PAIN_SUSTAINED: pain > 8 for 3+ consecutive days (find max consecutive run)
+RULE SLEEP_DEPRIVATION: sleepHours < 4 for 5+ consecutive days
+RULE MULTI_SYMPTOM: fatigue > 8 AND swelling > 8 on same day
+RULE MEDICATION_NON_COMPLIANCE: ALL meds false for 3+ consecutive days
+RULE RAPID_DETERIORATION: any metric increases 4+ points in 2 consecutive days
+RULE RECOVERY_PLATEAU: 14+ days logged, last 7 days avg pain within 1 point of first 7 days avg, patient past day 10
+
+Return { triggered: rules.length > 0, rules, reason: rules.join('; ') }
+
+FUNCTION — runEscalationCheck(patientId: string, io: Server): Promise<EscalationResult>
+
+1. Fetch last 14 logs from Prisma ordered ASC, parse medicationTaken JSON on each
+2. If < 2 logs: return { escalated: false, severity: 'NORMAL' }
+3. Run checkRules
+4. If not triggered: return { escalated: false, severity: 'NORMAL' }
+5. Call groqService.runAIEscalationCheck (try/catch fallback to MONITOR)
+6. Severity logic:
+   CRITICAL = rules triggered AND ai verdict ALERT
+   MONITOR = rules triggered AND ai verdict MONITOR
+   NORMAL = ai verdict NORMAL (overrides rules)
+7. Prisma create escalation record
+8. If CRITICAL or MONITOR: emit to 'doctor_alerts' room:
+   { patientId, severity, reason: aiResult.reason, isSOS: false, timestamp }
+9. Call checkAndAwardMilestones(patientId, logs) — don't await
+10. Return EscalationResult
+
+FUNCTION — triggerSOS(patientId: string, io: Server): Promise<EscalationResult>
+
+Create critical escalation with isSOS=true.
+Emit immediately to 'doctor_alerts' with isSOS: true.
+Return result.
+
+FUNCTION — checkAndAwardMilestones(patientId: string, logs: any[]): Promise<void>
+
+Check and upsert these milestones using Prisma:
+- first_log: logs.length >= 1 → "First symptom logged! Your journey begins." 🌱
+- week_streak: last 7 log dates all consecutive → "7-day logging streak! Perfect consistency." 🔥
+- pain_improvement_5: 5 consecutive logs with decreasing pain → "5 days of reducing pain!" 📉
+- sleep_champion: 5 consecutive logs sleepHours >= 7 → "5 nights of great sleep!" 😴
+- pain_halved: last pain <= first pain / 2 → "Pain reduced by half since day 1!" 🎯
+- med_compliance_week: last 7 logs all meds true → "Perfect medication week!" 💊
+
+## FILE: backend/src/services/recovery.service.ts
+
+FUNCTION — detectRecoveryStage(dischargeDate: Date, logs: any[]): RecoveryStageInfo
+
+daysSince = floor((now - dischargeDate) / 86400000)
+avgPainRecent = avg pain of last 5 logs
+
+If daysSince <= 7 OR avgPainRecent > 7: ACUTE
+  label: "Week 1 — Acute Recovery"
+  color: "red"
+  guidance.title: "Focus on Rest & Wound Care"
+  guidance.instructions: ["Rest as much as possible", "Take all medications exactly on schedule", "Keep surgical wound clean and dry", "Apply ice 20 minutes every 2 hours for swelling", "Eat protein-rich foods to support tissue healing"]
+  guidance.restrictions: ["No strenuous physical activity", "Do not get wound area wet", "Avoid alcohol completely", "No driving until cleared by doctor"]
+  guidance.watchFor: ["Fever above 38°C / 100.4°F", "Increasing redness or warmth around wound", "Pus or unusual discharge", "Sudden severe pain increase"]
+
+If daysSince <= 14 OR avgPainRecent > 4: SUBACUTE
+  label: "Week 2 — Subacute Phase"
+  color: "yellow"
+  guidance.title: "Gentle Movement & Nutrition"
+  guidance.instructions: ["Begin gentle walking 5-10 minutes twice daily", "Continue all prescribed medications", "Focus on high-protein, anti-inflammatory diet", "Aim for 7-9 hours of sleep each night", "Practice deep breathing exercises to prevent complications"]
+  guidance.restrictions: ["No lifting over 2kg", "Avoid high-impact activities", "Do not skip physiotherapy appointments"]
+  guidance.watchFor: ["Pain worsening after gentle activity", "New or increasing swelling", "Difficulty bearing weight that is not improving"]
+
+Else: REHABILITATION
+  label: "Week 3+ — Rehabilitation Phase"
+  color: "green"
+  guidance.title: "Progressive Strength & Activity"
+  guidance.instructions: ["Increase walking distance and duration gradually each day", "Follow your physiotherapy exercise program consistently", "Return to light daily activities as tolerated", "Stay hydrated — minimum 2 litres of water daily", "Track your progress and celebrate improvements"]
+  guidance.restrictions: ["Avoid high-impact sports for minimum 6 weeks", "Stop immediately if you feel sharp or sudden pain"]
+  guidance.watchFor: ["Plateau in improvement after 2 weeks of rehab", "Swelling recurring with increased activity", "New symptoms not present in early recovery"]
+
+FUNCTION — calculateRiskScore(logs: any[], escalations: any[]): { score: number, level: string }
+
+Weighted factors:
+- avgPain last 7 days / 10 * 35
+- (10 - avgSleep last 7 days) / 10 * 20
+- avgFatigue last 7 days / 10 * 20
+- activeEscalations count * 5 (max 15)
+- (missedMedDays / 7) * 10
+
+score = Math.min(Math.round(sum), 100)
+level: score < 40 = 'low', < 70 = 'medium', else 'high'
+Return { score, level }
+
+## FILE: backend/src/services/email.service.ts
+
+Create nodemailer transporter using Gmail SMTP.
+FUNCTION — sendDailyCaregiverUpdate(to: string, patientName: string, message: string): Promise<void>
+
+HTML email with:
+- Blue header: "Recovery Companion Daily Update"
+- Patient name in h2
+- Message text
+- "Recovery is being monitored. You'll hear from us daily." footer
+- "Powered by Recovery Companion" branding
+
+Wrap in try/catch, log error but never throw (email failure should not crash the app).
+
+## FILE: backend/src/controllers/auth.controller.ts
+
+POST /register:
+Zod schema: { name: string, email: email, password: min(8), role: PATIENT|DOCTOR,
+              condition?: string, dischargeDate?: string, caregiverEmail?: string, medications?: string[] }
+- Check duplicate email
+- bcrypt hash password (rounds: 12)
+- Prisma create user
+- Sign JWT { id, email, role }
+- Return { token, user: omit password }
+
+POST /login:
+Zod: { email, password }
+- Find user by email (401 "Invalid credentials" if not found — never reveal which field)
+- bcrypt compare (401 same message if wrong)
+- Sign JWT
+- Return { token, user: omit password }
+
+GET /me:
+verifyToken middleware
+- Prisma findUnique with milestones included
+- Return user without password
+
+PUT /profile:
+verifyToken
+Zod: { name?, caregiverEmail?, medications?: string[] }
+- Update user
+- Return updated without password
+
+## FILE: backend/src/controllers/request.controller.ts
+
+POST /send:
+verifyToken, requireRole('DOCTOR')
+Zod: { patientId: string }
+- Verify patient exists and is PATIENT role (404 if not)
+- Check no existing request between them (409 if exists)
+- Prisma create DoctorPatientRequest status PENDING
+- Emit to `patient:${patientId}` socket room:
+  'connection_request' event with { requestId, doctorId, doctorName, doctorEmail }
+- Return { request, message: 'Request sent to patient' }
+
+GET /pending:
+verifyToken
+- If PATIENT: find all PENDING requests received, include doctor { id, name, email }
+- If DOCTOR: find all requests sent, include patient { id, name, email, condition, dischargeDate }
+- Return { requests }
+
+GET /my-doctor:
+verifyToken, requireRole('PATIENT')
+- Find ACCEPTED request where patientId = me
+- Include doctor full profile (exclude password)
+- Return { doctor: User|null, connected: boolean }
+
+GET /my-patients:
+verifyToken, requireRole('DOCTOR')
+- Find all ACCEPTED requests where doctorId = me
+- For each patient:
+  Fetch latest symptom log
+  Fetch latest active escalation
+  Calculate severity: CRITICAL if active critical escalation, MONITOR if monitor, else RECOVERING
+  Calculate risk score using recoveryService
+  Calculate summary: avgPain7d, avgSleep7d, streak, painTrend
+- Sort: CRITICAL first, MONITOR second, RECOVERING third
+- Return { patients }
+
+POST /:id/accept:
+verifyToken, requireRole('PATIENT')
+- Find request by id, verify patientId = me
+- Verify status is PENDING (400 if not)
+- Check patient has no other ACCEPTED request (400 "You already have a connected doctor. Disconnect first.")
+- Update status to ACCEPTED
+- Emit to `doctor:${doctorId}`: 'request_accepted' { requestId, patientId, patientName, patientCondition }
+- Return { message: 'Doctor connected successfully' }
+
+POST /:id/reject:
+verifyToken, requireRole('PATIENT')
+- Find request, verify belongs to patient
+- Update status to REJECTED
+- Emit to `doctor:${doctorId}`: 'request_rejected' { requestId, patientId }
+- Return { message: 'Request rejected' }
+
+DELETE /disconnect:
+verifyToken
+- PATIENT: find and delete their ACCEPTED request
+- DOCTOR: body { patientId }, find and delete that specific ACCEPTED request
+- Emit 'disconnected' event to the other party
+- Return { message: 'Disconnected' }
+
+## FILE: backend/src/controllers/symptom.controller.ts
+
+POST /log:
+verifyToken, requireRole('PATIENT')
+Zod: { pain?: int, fatigue?: int, swelling?: int, sleepHours?: float, mood?: string,
+       appetite?: int, rawInput?: string, voiceInput?: boolean, medicationTaken?: object, logDate?: string }
+- Default logDate = today as ISO date string
+- Upsert (create or update) symptom log
+- After save: call escalationService.runEscalationCheck(patientId, io) — don't await
+- If patient has caregiverEmail: fire email async (don't await)
+- Return { log, escalationResult }
+
+GET /logs:
+verifyToken
+Query: { patientId?, days?: number (default 14) }
+- PATIENT: always use own id
+- DOCTOR: use query patientId, verify ACCEPTED request exists between them
+- Return logs ordered DESC
+- Return { logs }
+
+GET /today:
+verifyToken, requireRole('PATIENT')
+- Check today's log exists
+- Return { hasLogged: boolean, log: SymptomLog|null }
+
+GET /summary/:patientId:
+verifyToken
+Access control same as logs.
+Calculate:
+- avgPain7d, avgSleep7d from last 7 logs
+- streak: count consecutive days with logs backwards from today
+- painTrend: 'improving'|'stable'|'worsening' (compare first 3 vs last 3 of recent 7)
+- totalLogged: total count
+- missedMedsCount: days in last 7 where any medication was false
+Return { summary }
+
+GET /trend/:patientId:
+verifyToken
+Same access control.
+Return [{ date, pain, fatigue, swelling, sleepHours, mood, appetite }] ordered ASC
+
+## FILE: backend/src/controllers/patient.controller.ts
+
+GET /:id:
+verifyToken
+- PATIENT: can only get own profile
+- DOCTOR: verify ACCEPTED request exists between them
+- Include milestones
+- Return patient without password
+
+GET /:id/full:
+verifyToken, requireRole('DOCTOR')
+- Verify ACCEPTED request
+- Fetch: patient profile, last 30 logs, all escalations, milestones
+- Calculate: riskScore, recoveryStage, summary
+- Return everything in one response
+
+POST /sos:
+verifyToken, requireRole('PATIENT')
+- Call escalationService.triggerSOS(req.user.id, io)
+- Return { triggered: true }
+
+PUT /escalations/:id/review:
+verifyToken, requireRole('DOCTOR')
+- Update status REVIEWED, set reviewedById, reviewedAt
+- Return { updated: true }
+
+## FILE: backend/src/controllers/ai.controller.ts
+
+POST /parse-symptom:
+verifyToken, groqLimiter
+Zod: { text: string }
+Call groqService.parseSymptomText, return { parsed }
+
+POST /patient-insight:
+verifyToken, groqLimiter
+Zod: { patientId: string }
+- Access control
+- Fetch summary
+- Check Redis cache: key patient_insight:${patientId}:${today} — if exists return cached
+- Call groqService.generatePatientInsight
+- Cache result for 3600 seconds
+- Return { insight }
+
+POST /doctor-summary:
+verifyToken, requireRole('DOCTOR'), groqLimiter
+Zod: { patientId: string }
+- Verify ACCEPTED request
+- Fetch full patient data
+- Call groqService.generateDoctorSummary
+- Return { summary }
+
+## FILE: backend/src/routes/index.ts
+
+```typescript
+import { Router } from 'express';
+import { Server } from 'socket.io';
+
+export function createRouter(io: Server): Router {
+  const router = Router();
+  
+  router.use('/auth', authRoutes);
+  router.use('/requests', requestRoutes(io));
+  router.use('/symptoms', symptomRoutes(io));
+  router.use('/patients', patientRoutes(io));
+  router.use('/ai', aiRoutes);
+  
+  return router;
+}
+```
+
+Each route file: export a factory function that accepts io and returns Router.
+Mount all controllers on correct paths with correct middleware.
+
+## FILE: backend/src/app.ts
+
+```typescript
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import morgan from 'morgan';
+import { createRouter } from './routes';
+import { errorHandler } from './middleware/errorHandler';
+import { apiLimiter } from './middleware/rateLimiter';
+import { env } from './config/env';
+import { Server } from 'socket.io';
+
+export function createApp(io: Server) {
+  const app = express();
+  
+  app.use(helmet());
+  app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
+  app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
+  app.use(express.json({ limit: '10mb' }));
+  app.use('/api', apiLimiter);
+  
+  app.get('/health', async (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date().toISOString(), uptime: process.uptime() });
+  });
+  
+  app.use('/api', createRouter(io));
+  app.use(errorHandler);
+  
+  return app;
+}
+```
+
+## FILE: backend/src/server.ts
+
+```typescript
+import http from 'http';
+import { Server } from 'socket.io';
+import { createApp } from './app';
+import { initSocket } from './socket/socket.manager';
+import prisma from './config/prisma';
+import { env } from './config/env';
+
+async function main() {
+  const httpServer = http.createServer();
+  
+  const io = new Server(httpServer, {
+    cors: { origin: env.FRONTEND_URL, methods: ['GET', 'POST'], credentials: true }
+  });
+  
+  initSocket(io);
+  
+  const app = createApp(io);
+  httpServer.on('request', app);
+  
+  await prisma.$connect();
+  console.log('✅ Database connected');
+  
+  httpServer.listen(env.PORT, () => {
+    console.log(`
+    ╔═══════════════════════════════════════╗
+    ║   🏥 Recovery Companion Backend       ║
+    ║   Running on http://localhost:${env.PORT}   ║
+    ║   Environment: ${env.NODE_ENV.padEnd(22)}║
+    ╚═══════════════════════════════════════╝
+    `);
+  });
+  
+  process.on('SIGTERM', async () => {
+    await prisma.$disconnect();
+    httpServer.close();
+    process.exit(0);
+  });
+}
+
+main().catch(console.error);
+```
+
+═══════════════════════════════════════════════════
+# PHASE 3: FRONTEND — BUILD IN THIS EXACT ORDER
+═══════════════════════════════════════════════════
+
+## FILE: frontend/package.json
+
+```json
+{
+  "name": "recovery-companion-frontend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0",
+    "axios": "^1.6.5",
+    "zustand": "^4.5.0",
+    "@tanstack/react-query": "^5.17.0",
+    "recharts": "^2.10.3",
+    "socket.io-client": "^4.7.2",
+    "react-hook-form": "^7.49.0",
+    "zod": "^3.22.4",
+    "@hookform/resolvers": "^3.3.4",
+    "framer-motion": "^10.18.0",
+    "clsx": "^2.1.0",
+    "date-fns": "^3.2.0",
+    "lucide-react": "^0.309.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11"
+  }
+}
+```
+
+## FILE: frontend/vite.config.ts
+
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { '@': path.resolve(__dirname, './src') } },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': { target: 'http://localhost:3001', changeOrigin: true },
+      '/socket.io': { target: 'http://localhost:3001', ws: true, changeOrigin: true }
+    }
+  }
+});
+```
+
+## FILE: frontend/tailwind.config.ts
+
+```typescript
+import type { Config } from 'tailwindcss';
+
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+          400: '#60a5fa', 500: '#3b82f6', 600: '#1a56db', 700: '#1d4ed8',
+          800: '#1e40af', 900: '#1e3a8a',
+        },
+      },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+      borderRadius: { card: '0.875rem', pill: '9999px' },
+      boxShadow: {
+        card: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+        'card-hover': '0 10px 30px rgba(0,0,0,0.12)',
+        'glow-blue': '0 0 24px rgba(26,86,219,0.3)',
+        'glow-red': '0 0 24px rgba(220,38,38,0.4)',
+        'glow-green': '0 0 24px rgba(22,163,74,0.3)',
+      },
+      animation: {
+        'pulse-slow': 'pulse 3s cubic-bezier(0.4,0,0.6,1) infinite',
+        'float': 'float 6s ease-in-out infinite',
+      },
+      keyframes: {
+        float: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-8px)' } }
+      }
+    },
+  },
+  plugins: [],
+} satisfies Config;
+```
+
+## FILE: frontend/src/index.css
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-gray-200 box-border; }
+  html { @apply scroll-smooth; }
+  body { @apply bg-gray-50 text-gray-900 font-sans antialiased; }
+  ::-webkit-scrollbar { @apply w-1.5 h-1.5; }
+  ::-webkit-scrollbar-track { @apply bg-gray-100 rounded-full; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full hover:bg-gray-400; }
+}
+
+@layer components {
+  .card { @apply bg-white rounded-card shadow-card border border-gray-100; }
+  .card-hover { @apply card transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer; }
+  
+  .input-base {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900
+    placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500
+    focus:border-transparent transition-all duration-200 text-sm;
+  }
+  
+  .btn { @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none; }
+  .btn-sm { @apply btn text-sm px-3 py-2; }
+  .btn-md { @apply btn text-sm px-4 py-2.5; }
+  .btn-lg { @apply btn text-base px-6 py-3; }
+  .btn-primary { @apply bg-primary-600 hover:bg-primary-700 active:bg-primary-800 text-white focus:ring-primary-500 shadow-sm hover:shadow-md; }
+  .btn-secondary { @apply bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 focus:ring-gray-300; }
+  .btn-danger { @apply bg-red-600 hover:bg-red-700 active:bg-red-800 text-white focus:ring-red-500; }
+  .btn-ghost { @apply bg-transparent hover:bg-gray-100 text-gray-600 focus:ring-gray-300; }
+  .btn-outline { @apply bg-transparent border-2 border-primary-600 text-primary-600 hover:bg-primary-50 focus:ring-primary-500; }
+  
+  .badge { @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-pill text-xs font-semibold; }
+  .badge-critical { @apply badge bg-red-100 text-red-700 border border-red-200; }
+  .badge-monitor { @apply badge bg-amber-100 text-amber-700 border border-amber-200; }
+  .badge-recovering { @apply badge bg-emerald-100 text-emerald-700 border border-emerald-200; }
+  .badge-normal { @apply badge bg-gray-100 text-gray-600 border border-gray-200; }
+  .badge-pending { @apply badge bg-blue-100 text-blue-700 border border-blue-200; }
+  
+  .metric-value { @apply text-3xl font-bold tracking-tight text-gray-900; }
+  .metric-label { @apply text-sm font-medium text-gray-500; }
+  
+  .section-heading { @apply text-lg font-semibold text-gray-900; }
+  .page-heading { @apply text-2xl font-bold text-gray-900; }
+}
+
+@layer utilities {
+  .text-gradient { background: linear-gradient(135deg, #1a56db, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .bg-gradient-primary { background: linear-gradient(135deg, #1e3a8a 0%, #1a56db 50%, #3b82f6 100%); }
+  .glass { @apply bg-white/80 backdrop-blur-sm border border-white/20; }
+}
+```
+
+## FILE: frontend/src/main.tsx
+
+```typescript
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App';
+import './index.css';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false },
+    mutations: { retry: 0 },
+  },
+});
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  </React.StrictMode>
+);
+```
+
+## FILE: frontend/src/api/axios.ts
+
+Axios instance:
+- baseURL: import.meta.env.VITE_API_URL
+- timeout: 15000
+- withCredentials: true
+Request interceptor: inject 'Authorization: Bearer {localStorage.getItem('rc_token')}' if exists
+Response interceptor:
+- 401: clear 'rc_token' from localStorage, redirect window.location to /login
+- Network error: throw new Error('Cannot connect to server. Is the backend running?')
+Export as default.
+
+## FILE: frontend/src/api/auth.api.ts
+
+All return .then(r => r.data):
+- login(email, password)
+- register(data: RegisterPayload)
+- getMe()
+- updateProfile(data)
+
+## FILE: frontend/src/api/request.api.ts
+
+- sendRequest(patientId: string)
+- getPendingRequests()
+- getMyDoctor()
+- getMyPatients()
+- acceptRequest(requestId: string)
+- rejectRequest(requestId: string)
+- disconnect()
+
+## FILE: frontend/src/api/symptom.api.ts
+
+- logSymptom(data)
+- getLogs(patientId: string, days?: number)
+- getTodayLog()
+- getSummary(patientId: string)
+- getTrend(patientId: string, days?: number)
+
+## FILE: frontend/src/api/patient.api.ts
+
+- getPatient(id: string)
+- getFullPatient(id: string)
+- triggerSOS()
+- reviewEscalation(id: string)
+
+## FILE: frontend/src/api/ai.api.ts
+
+- parseSymptom(text: string)
+- getPatientInsight(patientId: string)
+- getDoctorSummary(patientId: string)
+
+## FILE: frontend/src/store/useStore.ts
+
+Zustand store with persist for auth:
+
+Auth: { user: User|null, token: string|null }
+  setUser(user), setToken(token), logout() → clear user+token+localStorage, redirect /login
+
+Notifications: { notifications: Toast[] }
+  addNotification(n) → generate id, auto-remove after 5s with setTimeout
+  removeNotification(id)
+
+Socket: { connected: boolean, setConnected(v) }
+
+Rehydrate token from localStorage key 'rc_token' on store init.
+
+## FILE: frontend/src/hooks/useAuth.ts
+
+On mount: if token exists, call authApi.getMe()
+On success: setUser
+On error/401: logout()
+Return { user, isLoading, isAuthenticated, logout }
+
+## FILE: frontend/src/hooks/useSocket.ts
+
+On mount: create socket.io-client(VITE_SOCKET_URL, { withCredentials: true })
+After connect based on user role:
+  DOCTOR: emit 'join_doctor_room' with user.id
+  PATIENT: emit 'join_patient_room' with user.id
+
+Listeners:
+- 'patient_alert': addNotification({ type: 'alert', title: 'Patient Alert', message: event.reason })
+  + if Notification.permission === 'granted': new Notification('Recovery Companion Alert', { body: event.reason })
+  + also call requestNotificationPermission() on first connect
+  
+- 'connection_request': patient receives doctor request → addNotification({ type: 'info', title: 'New Connection Request', message: `Dr. ${event.doctorName} wants to connect` }) + invalidate requests query
+
+- 'request_accepted': doctor receives acceptance → addNotification({ type: 'success', title: 'Request Accepted', message: `${event.patientName} accepted your connection request` }) + invalidate patients query
+
+- 'request_rejected': doctor receives rejection → addNotification({ type: 'error', title: 'Request Rejected', message: 'Patient declined your connection request' })
+
+- 'connect': setConnected(true)
+- 'disconnect': setConnected(false)
+
+Cleanup on unmount: socket.disconnect()
+Return { socket, connected }
+
+## FILE: frontend/src/App.tsx
+
+```typescript
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
+import { ToastContainer } from '@/components/ui/ToastContainer';
+
+function ProtectedRoute({ children, role }: { children: React.ReactNode; role?: string }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (role && user.role !== role) return <Navigate to={user.role === 'DOCTOR' ? '/doctor' : '/patient'} replace />;
+  return <>{children}</>;
+}
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
+      <div className="text-white text-center">
+        <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-lg font-medium">Loading Recovery Companion...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const { user } = useAuth();
+  
+  return (
+    <BrowserRouter>
+      <ToastContainer />
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/" element={<Navigate to={user ? (user.role === 'DOCTOR' ? '/doctor' : '/patient') : '/login'} />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          <Route path="/patient" element={<ProtectedRoute role="PATIENT"><PatientLayout /></ProtectedRoute>}>
+            <Route index element={<PatientDashboard />} />
+            <Route path="log" element={<SymptomLogger />} />
+            <Route path="trends" element={<TrendView />} />
+            <Route path="guidance" element={<GuidanceView />} />
+            <Route path="requests" element={<PendingRequests />} />
+          </Route>
+          
+          <Route path="/doctor" element={<ProtectedRoute role="DOCTOR"><DoctorLayout /></ProtectedRoute>}>
+            <Route index element={<DoctorDashboard />} />
+            <Route path="patient/:id" element={<PatientDetail />} />
+            <Route path="connect" element={<ConnectPatient />} />
+          </Route>
+          
+          <Route path="*" element={<Navigate to="/login" />} />
+        </Routes>
+      </AnimatePresence>
+    </BrowserRouter>
+  );
+}
+```
+
+## FILE: frontend/src/components/ui/Button.tsx
+
+Production-grade button with:
+- Variants: primary, secondary, danger, ghost, outline
+- Sizes: sm, md, lg, icon
+- Loading: Loader2 spinner replacing content, button disabled
+- Framer Motion: whileTap={{ scale: 0.97 }}
+- Proper TypeScript props extending React.ButtonHTMLAttributes
+- clsx for conditional classes using global CSS classes
+
+## FILE: frontend/src/components/ui/Card.tsx
+
+Props: children, className, hoverable, onClick, padding ('none'|'sm'|'md'|'lg'), glow ('none'|'blue'|'red'|'green')
+- Uses 'card' and 'card-hover' classes
+- Framer Motion hover if hoverable
+- Glow via boxShadow style
+
+## FILE: frontend/src/components/ui/Badge.tsx
+
+Props: severity, pulse, children
+- Uses badge-* CSS classes
+- Critical: animated red dot before text
+- Pulse: Framer Motion pulsing ring
+
+## FILE: frontend/src/components/ui/Input.tsx
+
+Props: label, error, hint, leftIcon, rightIcon, type (with password toggle)
+- input-base class
+- Label slides up on focus (CSS)
+- Error: red border + error message with AnimatePresence slide
+- Password: show/hide eye button
+
+## FILE: frontend/src/components/ui/Modal.tsx
+
+Props: open, onClose, title, children, size, footer
+- Framer Motion: backdrop fade (opacity 0→1), content scale (0.95→1) + fade
+- Close on backdrop click and Escape key
+- Focus trap
+- Scrollable content with sticky header/footer
+
+## FILE: frontend/src/components/ui/Slider.tsx
+
+Props: label, value, onChange, min, max, step, colorScale, unit
+Custom range input:
+- When colorScale: background gradient green→yellow→red
+- Value pill floating above thumb
+- Track fills proportionally in blue
+- Min/max labels at ends
+
+## FILE: frontend/src/components/ui/MetricCard.tsx
+
+Props: label, value, unit, trend, trendGood, icon, iconColor, loading, subtext
+- Icon in colored circle (16px icon, 40px circle)
+- Large value with count-up animation (useEffect + interval)
+- Trend arrow: TrendingUp/TrendingDown/Minus from lucide
+- Color logic: if trend === trendGood direction → green, else red
+- Skeleton loader
+
+## FILE: frontend/src/components/ui/Toast.tsx + ToastContainer.tsx
+
+Toast: slide in from right, auto-dismiss with draining progress bar
+Types: success (emerald), error (red), warning (amber), info (blue), alert (purple)
+Icon per type from lucide-react
+Manual X dismiss
+Stacked in top-right fixed position
+
+## FILE: frontend/src/components/layout/Navbar.tsx
+
+PATIENT NAVBAR:
+- Height: 64px, white, shadow-sm, sticky top-0 z-40
+- Left: blue heart icon + "Recovery Companion" bold
+- Center links: Dashboard, Log Today, Trends, Guidance, Requests (with pending badge count if > 0)
+- Right: notification bell (with unread count badge), avatar with dropdown (name, email, Patient ID with copy button, Logout)
+- Recovery stage colored stripe below navbar (3px height, full width, color based on stage)
+- Mobile: hamburger → bottom sheet drawer
+
+DOCTOR NAVBAR:
+- Same structure
+- Center: My Patients, Connect Patient
+- Right: notification bell with alert count, avatar dropdown
+- When new alert fires: bell icon animates (wiggle animation via Framer Motion)
+
+SOS BUTTON (patient only, not inside navbar):
+- Fixed bottom-6 right-6 z-50
+- Red circle 64px, white "SOS" text bold
+- Framer Motion: scale pulse 1→1.08 every 2 seconds
+- Glow: shadow-glow-red
+- Click → confirmation Modal: "Alert your doctor immediately?"
+- After confirm: call triggerSOS, show green success state with checkmark
+
+## FILE: frontend/src/components/layout/PatientLayout.tsx + DoctorLayout.tsx
+
+Wrapper with Navbar + Outlet + SOSButton (patient only)
+Page content: max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8
+
+## FILE: frontend/src/components/charts/SymptomTrendChart.tsx
+
+Recharts LineChart inside ResponsiveContainer:
+Lines: pain (#ef4444) fatigue (#f97316) swelling (#a855f7) sleepHours (#3b82f6) appetite (#22c55e)
+- type="monotone", strokeWidth=2.5, dot=false, activeDot={{ r:5, strokeWidth:2 }}
+XAxis: date formatted as "Feb 10", tick style gray
+YAxis: domain [0, 12] (to accommodate sleep hours)
+CartesianGrid: dashed #f0f0f0
+Custom Tooltip: dark card, colored dots, all metrics, date header
+ReferenceArea for pain > 8: fill "#fee2e2" opacity 0.5, label "High Risk Zone"
+Date range selector: pill buttons 7D / 14D / All
+Loading skeleton: same height, shimmer animation
+
+## FILE: frontend/src/components/charts/RiskGauge.tsx
+
+Recharts RadialBarChart with one bar:
+- score 0-100
+- Color interpolated: 0-40 #22c55e, 41-70 #f59e0b, 71-100 #ef4444
+- Background ring gray
+- Center: score number bold large + level label small
+- Framer Motion animate on score change
+
+## FILE: frontend/src/components/charts/MedicationHeatmap.tsx
+
+Props: logs[], medications[]
+Grid: medications as rows, last 14 dates as columns
+Cell: colored circle:
+  all taken → #22c55e (emerald)
+  all missed → #ef4444 (red)
+  partial → #f59e0b (amber)
+  no log → #e5e7eb (gray)
+Tooltip on hover
+Adherence % per medication in left column
+Overall % below
+
+## FILE: frontend/src/pages/Login.tsx
+
+TWO-COLUMN LAYOUT (full viewport height):
+
+LEFT PANEL (hidden on mobile, 45% width):
+Background: bg-gradient-primary
+Content centered:
+- Large white icon: Shield with heart
+- "Recovery Companion" in white 36px bold
+- Quote: "Bridging the gap between discharge and recovery" in white/70 italic
+- 3 feature rows with check icons:
+  "Real-time symptom monitoring"
+  "AI-powered escalation alerts"
+  "Voice-first daily logging"
+- Floating medical icon animations (Framer Motion float animation)
+
+RIGHT PANEL (full width mobile, 55% desktop):
+White background, flex center:
+- Card: max-w-md, no shadow (white on white)
+- Logo (mobile only): small blue heart + "Recovery Companion"
+- "Welcome back" h1 dark, "Sign in to continue" gray subtitle
+- Form (react-hook-form):
+  Email input with Mail icon
+  Password input with Lock icon + show/hide toggle
+  "Forgot password?" link (UI only)
+  Submit button full width, loading state
+- Error alert: red, AnimatePresence fade-in
+- "Don't have an account?" → /register link
+
+Framer Motion page entrance: fade in + slide up 20px
+On success: store token+user, navigate to role dashboard
+
+## FILE: frontend/src/pages/Register.tsx
+
+Multi-step with animated step transitions.
+
+STEP INDICATOR (top):
+- 2 circles connected by line: "1 Account" → "2 Profile"
+- Active: filled blue. Complete: checkmark. Inactive: gray border
+- Animated progress bar
+
+STEP 1 — Account Info:
+Role selector (two large cards side by side):
+  PATIENT CARD: User icon, "I'm a Patient", "Track my recovery journey"
+  DOCTOR CARD: Stethoscope icon, "I'm a Doctor", "Monitor my patients"
+  Selected: blue border + bg-primary-50 + checkmark badge
+Fields: Name, Email, Password (with strength bar), Confirm Password
+"Continue →" button
+
+STEP 2 PATIENT — Profile:
+- Medical Condition (text input, e.g. "Post knee replacement surgery")
+- Discharge Date (date input, max=today)
+- Caregiver Email (optional, with info tooltip "We'll send daily updates to this person")
+- Medications tag input:
+  Type medication name + Enter to add
+  Each medication appears as a blue pill with × remove button
+  Placeholder: "e.g. Ibuprofen 400mg"
+- "Create Account" primary button
+
+STEP 2 DOCTOR — Simple:
+- Info card: "After registration, search for patients by their Recovery Companion ID to connect"
+- "Create Account" primary button
+
+Framer Motion: steps slide left/right with AnimatePresence
+
+## FILE: frontend/src/pages/patient/PatientDashboard.tsx
+
+DATA: useQuery for todayLog, summary, trend(7d), insight, requests(pending count), milestones
+
+LAYOUT (stagger animate children on mount):
+
+SECTION 1 — TOP HEADER:
+- Full width, white card
+- Left: "Good [morning/afternoon/evening], {firstName}!" with wave emoji
+  Sub: "{condition} Recovery · Day {N} since discharge"
+- Right: Recovery stage badge (color-coded) + days counter
+
+NOT-LOGGED-TODAY BANNER (if !hasLogged):
+- Full width amber banner between header and content
+- AlertTriangle icon + "You haven't logged today's symptoms yet"
+- "Log Now →" button (primary, navigates to /patient/log)
+- Framer Motion: slide down from top
+
+SECTION 2 — METRIC CARDS (4 in row):
+MetricCard components:
+1. Pain Level: current pain, trend vs yesterday
+2. Sleep Last Night: hours, trend
+3. Log Streak: consecutive days, fire emoji if > 5
+4. Risk Score: RiskGauge (mini, size=80) + level text
+
+SECTION 3 — TWO COLUMN:
+
+LEFT (lg:col-span-2):
+  TREND CARD:
+    Header: "7-Day Overview" + date range pills
+    SymptomTrendChart (7D default, all 5 metrics)
+    Link: "View full trends →"
+  
+  MILESTONE CARD (AnimatePresence, only if milestones exist):
+    Framer Motion slide-up from bottom
+    Trophy icon + yellow background
+    "{icon} {title}"
+    Date achieved
+    Dismiss X button
+
+RIGHT (lg:col-span-1):
+  AI INSIGHT CARD:
+    Sparkles icon + "Today's Insight"
+    Light blue gradient background (from-blue-50 to-indigo-50)
+    Insight text (loading skeleton while fetching)
+    "Personalized based on your last 7 days" caption
+    Refresh button
+
+  RECOVERY STAGE CARD:
+    Stage badge + colored header
+    "Today's Focus:" label
+    Top 3 instructions as checklist items
+    "View full guidance →" link
+
+  PATIENT ID CARD:
+    "Your Patient ID" heading
+    ID displayed in monospace, gray background
+    Copy button (copy to clipboard + toast "Copied!")
+    "Share this ID with your doctor to connect"
+
+## FILE: frontend/src/pages/patient/SymptomLogger.tsx
+
+HEADER: Back arrow + "How are you feeling today?" + date (Thursday, February 20)
+
+TABS (3): [🎤 Speak] [✍️ Type] [🎛️ Manual]
+Animated underline indicator sliding between tabs
+
+─── SPEAK TAB ───
+
+Large mic button (center, 80px circle):
+IDLE: bg-primary-600, white mic icon, "Tap to start" below
+RECORDING: red bg, white stop icon, pulsing ring animation (scale 1→1.4 infinite), "Listening..." text
+  Live transcript appears below in gray card as patient speaks
+PROCESSING: spinner + "Understanding your symptoms..."
+DONE: shows ParsedReview component
+
+Web Speech API implementation:
+  new (window.SpeechRecognition || window.webkitSpeechRecognition)()
+  continuous = false, interimResults = true, lang = 'en-IN'
+  onresult: build transcript from results
+  onend: send to POST /api/ai/parse-symptom
+
+─── TYPE TAB ───
+
+Large textarea (6 rows):
+  placeholder: "Tell me how you're feeling today. Mention pain levels, sleep quality, swelling, medications taken..."
+"Analyze Symptoms" button → calls parse-symptom API
+Then shows ParsedReview
+
+─── MANUAL TAB ───
+
+Slider per metric:
+  Pain (1-10) colorScale=true unit="/10"
+  Fatigue (1-10) colorScale=true
+  Swelling (1-10) colorScale=true
+  Sleep (0-12) unit=" hours"
+  Appetite (1-10)
+
+Mood grid: 5 large emoji buttons (😄😊😐😕😫) with label
+Selected: scale(1.2) blue ring
+
+Goes straight to Medication Section
+
+─── PARSED REVIEW CARD (after AI parsing) ───
+
+"Symptoms Detected" heading
+Grid of metric rows:
+  [icon] [label] [value badge] [edit icon]
+Click edit icon: inline Slider appears with current value
+Null values: amber "Not mentioned" badge + "Set manually" with Slider
+
+─── MEDICATION SECTION (all tabs) ───
+
+"Medication Check" heading
+Load from user.medications
+Each medication row:
+  - Name
+  - 3 pill buttons: [✓ Taken] [✗ Missed] [~ Partial]
+  - Default all to Taken
+  - Selected button highlighted
+
+─── SUBMIT ───
+
+"Save Today's Log" full-width primary button
+
+Multi-step loading:
+  "Saving..." (0.5s)
+  "Analyzing patterns..." (1s)
+  "Checking milestones..." (0.5s)
+
+Response handling:
+  CRITICAL escalation → red alert card + "Your doctor has been immediately notified"
+  MONITOR escalation → amber card + "We're monitoring some patterns"
+  No escalation → green card + "All looks good! Keep it up."
+
+If new milestone earned: celebration card with confetti emoji
+
+Success: checkmark draws itself (SVG stroke animation)
+Auto-navigate to dashboard after 3s with countdown: "Returning in 3..."
+
+## FILE: frontend/src/pages/patient/PendingRequests.tsx
+
+DATA: useQuery for getPendingRequests(), refetch on socket 'connection_request' event
+
+HEADER: "Connection Requests" + pending count badge
+
+IF NO REQUESTS:
+  Empty state: Users icon + "No pending requests"
+  "Doctors can find you using your Patient ID" info card
+  Show Patient ID with copy button
+
+REQUEST CARDS (each):
+Card with:
+  - Doctor avatar (initials in blue circle)
+  - Dr. {name}
+  - Email address
+  - "Wants to monitor your recovery" gray text
+  - Timestamp "Received 2 hours ago"
+  - Two buttons: [Accept ✓] green, [Decline ✗] red
+  - Loading state while accepting/rejecting
+
+On accept: optimistic update, remove card with slide-out animation, success toast "Dr. X is now your doctor!"
+On reject: slide-out, neutral toast
+
+CONNECTED STATE (if patient already has a doctor):
+Show current doctor card:
+  - Dr. name + email
+  - "Connected since {date}"
+  - Green badge "Connected"
+  - "Disconnect" ghost red button with confirmation
+
+## FILE: frontend/src/pages/doctor/ConnectPatient.tsx
+
+LAYOUT: centered, max-w-lg
+
+HEADER: "Connect with a Patient"
+Sub: "Enter the patient's Recovery Companion ID to send a connection request"
+
+SEARCH FORM:
+Input: "Enter Patient ID" with Search icon
+"Find Patient" button (primary)
+
+LOADING STATE: spinner while searching
+
+PATIENT PREVIEW CARD (on found):
+Framer Motion fade-in:
+  - Patient name (initials avatar in blue circle)
+  - Condition
+  - Discharge date formatted
+  - "Day X of recovery"
+  - "Send Connection Request" primary button
+
+ERROR STATE: "Patient not found" or "Request already sent" or "Already connected"
+
+AFTER SEND:
+  Success: green card "Request sent! Waiting for {name} to accept"
+  Bell icon animation
+
+SENT REQUESTS LIST:
+Below form: "Your Sent Requests"
+List of all requests with status badges:
+  PENDING: amber + "Waiting for response"
+  ACCEPTED: green + "Connected" + "View Patient" link
+  REJECTED: red + "Declined by patient" + "Send Again" link
+
+## FILE: frontend/src/pages/doctor/DoctorDashboard.tsx
+
+DATA: useQuery for getMyPatients() with refetch every 30s
+useSocket() for real-time
+
+HEADER:
+"Patient Overview" page-heading
+"Dr. {name} · {N} patients under care" subtitle
+Stats row: [Critical: N] [Monitoring: N] [Recovering: N] — colored pill chips
+"Connect New Patient" button → /doctor/connect
+
+ALERT BANNER (appears when socket fires patient_alert):
+Framer Motion slide down from top, full width
+Red gradient background
+"⚠️ New Alert: {patientName}" + "View Patient →" button
+Auto-dismiss 10s with progress bar, manual dismiss X
+
+FILTER + SEARCH:
+Pill buttons: All / Critical / Monitoring / Recovering
+Search input: filter by patient name
+Results count: "Showing 4 of 7 patients"
+
+PATIENT GRID (auto-fill columns, min 300px):
+Each PatientCard:
+
+Card component (hoverable):
+  TOP: name (font-semibold) + severity badge right
+  CONDITION: gray text + "Day X of recovery" blue text
+  METRICS ROW (3 columns):
+    Pain: value + trend arrow
+    Sleep: value + trend arrow
+    Risk: mini RiskGauge (size=60)
+  AI SUMMARY: one-line italic gray text
+  FOOTER: "Last logged: X hours ago" (red if > 24h) + "View Details →" blue link
+
+CRITICAL card: border-l-4 border-red-500 + light red bg tint
+SOS card: glow-red shadow + pulsing border
+New alert card: Framer Motion flash animation
+
+Sort: CRITICAL first, highest risk within group
+
+EMPTY STATE: illustration + "No connected patients" + "Connect Patient →" button
+
+## FILE: frontend/src/pages/doctor/PatientDetail.tsx
+
+DATA: useQuery for getFullPatient(id), mutation for getDoctorSummary
+
+BACK: ← All Patients (Link with Framer Motion hover)
+
+PATIENT HEADER (full width card):
+LEFT: initials avatar (60px) + name (h1) + condition (gray) + badges row (stage + severity)
+RIGHT: RiskGauge (size=120) + risk level label
+
+SUMMARY METRICS (4 cards row):
+Days since discharge / Total logs / Active alerts / Med compliance %
+
+AI CLINICAL SUMMARY (full width, blue gradient card):
+Brain icon + "AI Clinical Summary"
+Summary text (loading skeleton while fetching)
+"Regenerate" ghost button + last generated timestamp
+
+TAB NAVIGATION: Trends / Medications / Alerts / Guidance
+Animated underline indicator
+
+─── TRENDS TAB ───
+SymptomTrendChart (14D default) full width
+3 auto-calculated insight cards below:
+  Best metric this week
+  Needs attention metric
+  Overall trajectory
+
+─── MEDICATIONS TAB ───
+MedicationHeatmap full width
+Adherence stats per medication in table
+Compliance insight from Groq if available
+
+─── ALERTS TAB ───
+Timeline (newest first):
+Each item:
+  Left: colored dot (red critical, amber monitor, gray normal)
+  Timestamp + relative time
+  Severity badge + SOS badge if applicable
+  Rules triggered as gray code tags
+  AI verdict + reason + confidence bar (0-100%)
+  ACTIVE: "Mark Reviewed" button → optimistic update → REVIEWED green
+  REVIEWED: green checkmark + reviewer name
+
+─── GUIDANCE TAB ───
+Current stage horizontal progress bar: [Acute] ——●—— [Subacute] ——— [Rehabilitation]
+Stage card with all guidance sections
+Below: milestone list for this patient
+
+QUICK ACTIONS (bottom sticky bar on mobile, right column desktop):
+"Schedule Follow-up" → toast "Follow-up scheduled"
+"Mark All Reviewed" → bulk update
+"Disconnect Patient" → confirmation modal → disconnect
+
+═══════════════════════════════════════════════════
+# COMMANDS TO RUN (IN ORDER)
+═══════════════════════════════════════════════════
+
+After all files are created, run these in order:
+
+# TERMINAL 1 — Start DB + Redis
+cd recovery-companion
+docker compose -f docker-compose.dev.yml up -d
+
+# Wait ~10 seconds for containers to be healthy, then verify:
+docker compose -f docker-compose.dev.yml ps
+# postgres: healthy, redis: healthy
+
+# TERMINAL 2 — Start Backend
+cd recovery-companion/backend
+npm install
+npx prisma db push
+npm run dev
+# Should see: 🏥 Recovery Companion Backend — Running on http://localhost:3001
+
+# Verify backend:
+# GET http://localhost:3001/health → { "status": "healthy" }
+
+# TERMINAL 3 — Start Frontend
+cd recovery-companion/frontend
+npm install
+npm run dev
+# Should see: VITE ready → http://localhost:5173
+
+# VERIFY EVERYTHING:
+# Open http://localhost:5173 → Login page appears
+# Register a doctor account
+# Register a patient account
+# Patient: copy their ID from dashboard
+# Doctor: go to Connect Patient → enter ID → send request
+# Patient: go to Requests → accept
+# Doctor: patient appears in dashboard ✓
+
+# PGADMIN (optional, to inspect DB):
+# http://localhost:5050
+# Login: admin@admin.com / admin
+# Add server: host=localhost port=5432 db=recovery_dev user=admin pass=admin123
+
+═══════════════════════════════════════════════════
+# DO NOT FORGET
+═══════════════════════════════════════════════════
+
+1. Get Groq API key FREE at: https://console.groq.com
+   Add to backend/.env: GROQ_API_KEY=your_key
+
+2. Every data access between doctor and patient MUST verify
+   an ACCEPTED DoctorPatientRequest exists between them.
+   This is your security model.
+
+3. Symptom logs, escalations, AI summaries — all gated by
+   the accepted connection check in the controller.
+
+4. The io (Socket.io Server) instance must be threaded from
+   server.ts → createApp(io) → createRouter(io) → controllers
+   so real-time events can fire from within controllers.
+
+═══════════════════════════════════════════════════
+# BUILD ORDER SUMMARY
+═══════════════════════════════════════════════════
+
+Phase 1: Docker files → docker-compose up
+Phase 2: Backend
+  2.1 package.json + tsconfig → npm install
+  2.2 prisma/schema.prisma → npx prisma db push
+  2.3 src/types + src/config/*
+  2.4 src/middleware/*
+  2.5 src/socket/socket.manager.ts
+  2.6 src/services/groq.service.ts
+  2.7 src/services/escalation.service.ts
+  2.8 src/services/recovery.service.ts
+  2.9 src/services/email.service.ts
+  2.10 src/controllers/* (all 6)
+  2.11 src/routes/* (all 6 + index)
+  2.12 src/app.ts + src/server.ts
+  → npm run dev → verify /health
+Phase 3: Frontend
+  3.1 package.json + vite.config + tailwind.config → npm install
+  3.2 src/index.css + src/main.tsx
+  3.3 src/api/* (all 5)
+  3.4 src/store/useStore.ts
+  3.5 src/hooks/useAuth.ts + useSocket.ts
+  3.6 src/components/ui/* (all 10)
+  3.7 src/components/charts/* (all 3)
+  3.8 src/components/layout/* (all 3)
+  3.9 src/App.tsx
+  3.10 src/pages/Login.tsx + Register.tsx
+  3.11 src/pages/patient/* (all 4)
+  3.12 src/pages/doctor/* (all 3)
+  → npm run dev → verify at localhost:5173
