@@ -11,10 +11,9 @@ from typing import Any
 from groq import AsyncGroq
 
 from app.core.config import settings
-from app.core.constants import GROQ
+from app.core.constants import CACHE_TTL, GROQ
 from app.core.logger import logger
 from app.core.redis import redis_client
-from app.core.constants import CACHE_TTL
 
 client = AsyncGroq(api_key=settings.groq_api_key)
 

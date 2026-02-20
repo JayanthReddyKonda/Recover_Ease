@@ -35,9 +35,9 @@ async def join_doctor_room(sid: str, data: dict) -> None:
     doctor_id = data.get("doctor_id")
     if doctor_id:
         room = f"doctor:{doctor_id}"
-        sio.enter_room(sid, room)
+        await sio.enter_room(sid, room)
         # Also join the broadcast room
-        sio.enter_room(sid, "doctor_alerts")
+        await sio.enter_room(sid, "doctor_alerts")
         logger.info("doctor_joined_room", sid=sid, room=room)
 
 
@@ -47,7 +47,7 @@ async def join_patient_room(sid: str, data: dict) -> None:
     patient_id = data.get("patient_id")
     if patient_id:
         room = f"patient:{patient_id}"
-        sio.enter_room(sid, room)
+        await sio.enter_room(sid, room)
         logger.info("patient_joined_room", sid=sid, room=room)
 
 

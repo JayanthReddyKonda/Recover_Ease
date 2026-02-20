@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     await redis_client.close()
 
 
-def create_app() -> FastAPI:
+def create_app() -> socketio.ASGIApp:
     """Build and return the FastAPI application."""
     app = FastAPI(
         title="Recovery Companion API",
@@ -80,7 +80,7 @@ def create_app() -> FastAPI:
 
     # Rate limiter
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Custom error handlers
     register_exception_handlers(app)
@@ -104,7 +104,7 @@ def create_app() -> FastAPI:
     # ── Mount Socket.IO ─────────────────────────────
     sio_asgi = socketio.ASGIApp(sio, other_asgi_app=app)
 
-    return sio_asgi  # type: ignore[return-value]
+    return sio_asgi
 
 
 # Module-level app for `uvicorn app.main:app`

@@ -48,11 +48,9 @@ async def get_patient_insight(request: Request, patient: PatientUser, db: DbSess
 @limiter.limit(AI_LIMIT)
 async def get_doctor_summary(request: Request, patient_id: UUID, doctor: DoctorUser, db: DbSession):
     """Get AI-generated clinical summary for a specific patient (doctor only)."""
-    from app.services import patient_service
-
     # Verify doctor access
-    from sqlalchemy import select, func
-    from app.models.models import User, SymptomLog
+    from sqlalchemy import select
+    from app.models.models import User
 
     result = await db.execute(select(User).where(User.id == patient_id))
     patient = result.scalar_one_or_none()
