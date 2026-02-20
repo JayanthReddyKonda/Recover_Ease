@@ -60,6 +60,7 @@ export interface RegisterRequest {
     password: string;
     name: string;
     role: Role;
+    whatsapp_phone?: string | null;
     surgery_date?: string | null;
     surgery_type?: string | null;
     caregiver_email?: string | null;

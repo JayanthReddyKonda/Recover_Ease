@@ -152,24 +152,28 @@ export default function ProfilePage() {
                                     {...register("caregiver_email")}
                                     error={errors.caregiver_email?.message}
                                 />
-                                <div className="rounded-xl border border-green-100 bg-green-50 p-3.5">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <Smartphone className="h-3.5 w-3.5 text-green-600" />
-                                        <span className="text-xs font-semibold text-green-700">WhatsApp Bot Logging</span>
-                                    </div>
-                                    <p className="text-[11px] text-green-600 mb-2.5">
-                                        Link your WhatsApp number to log symptoms by simply texting the bot — no app needed.
-                                        Format: <code className="bg-green-100 px-1 py-0.5 rounded">+[country][number]</code> e.g. +919876543210
-                                    </p>
-                                    <Input
-                                        label="WhatsApp Number (E.164)"
-                                        placeholder="+919876543210"
-                                        {...register("whatsapp_phone")}
-                                        error={errors.whatsapp_phone?.message}
-                                    />
-                                </div>
                             </>
                         )}
+
+                        {/* WhatsApp phone — shown for both patients and doctors */}
+                        <div className="rounded-xl border border-green-100 bg-green-50 p-3.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                                <Smartphone className="h-3.5 w-3.5 text-green-600" />
+                                <span className="text-xs font-semibold text-green-700">WhatsApp Notifications</span>
+                            </div>
+                            <p className="text-[11px] text-green-600 mb-2.5">
+                                {user?.role === "PATIENT"
+                                    ? "Log symptoms by texting the bot — no app needed."
+                                    : "Receive instant WhatsApp alerts when a patient escalates."}
+                                {" "}Format: <code className="bg-green-100 px-1 py-0.5 rounded">+919876543210</code>
+                            </p>
+                            <Input
+                                label="Phone Number (E.164)"
+                                placeholder="+919876543210"
+                                {...register("whatsapp_phone")}
+                                error={errors.whatsapp_phone?.message}
+                            />
+                        </div>
                         <Button type="submit" loading={updateMut.isPending} disabled={!isDirty}>
                             Save Changes
                         </Button>

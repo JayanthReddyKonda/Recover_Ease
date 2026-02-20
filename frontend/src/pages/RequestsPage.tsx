@@ -115,7 +115,7 @@ function AiCarePlanCard({ plan }: { plan: AiStructuredPlan }) {
                                 <ul className="space-y-1">
                                     {plan.care_instructions.map((c, i) => (
                                         <li key={i} className="flex gap-2 text-sm text-gray-700">
-                                            <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary-400 shrink-0 mt-1.5" />
+                                            <span className="h-1.5 w-1.5 rounded-full bg-primary-400 shrink-0 mt-1.5" />
                                             {c}
                                         </li>
                                     ))}

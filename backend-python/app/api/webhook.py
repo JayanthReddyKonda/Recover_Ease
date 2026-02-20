@@ -147,6 +147,7 @@ async def _handle_text_message(raw_phone: str, text: str, db: DbSession) -> None
         sleep_hours=parsed["sleep_hours"],
         appetite=parsed["appetite"],
         energy=parsed["energy"],
+        temperature=None,
         notes=parsed.get("notes") or text,
     )
 

@@ -185,7 +185,8 @@ async def structure_clinical_request(
     return await _chat(system, user_prompt, max_tokens=900)
 
 
-async def get_escalation_verdict(symptom_data: dict, rule_results: list[dict]) -> dict[str, Any] | None:    """Ask AI to validate rule-based escalation triggers and provide a verdict."""
+async def get_escalation_verdict(symptom_data: dict, rule_results: list[dict]) -> dict[str, Any] | None:
+    """Ask AI to validate rule-based escalation triggers and provide a verdict."""
     cache_key = f"escalation:{symptom_data.get('log_id')}"
     system = (
         "You are a clinical escalation reviewer. Given the patient's symptoms and rule-based triggers, "

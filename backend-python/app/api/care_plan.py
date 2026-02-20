@@ -47,7 +47,7 @@ def _link_to_response(link: DoctorPatient) -> CarePlanResponse:
         doctor_id=str(link.doctor_id),
         specialty=link.specialty,
         is_active=link.is_active,
-        medications=link.medications,
+        medications=link.medications if isinstance(link.medications, list) else None,
         expected_recovery_date=link.expected_recovery_date,
         recovery_duration=link.recovery_duration,
         care_notes=link.care_notes,

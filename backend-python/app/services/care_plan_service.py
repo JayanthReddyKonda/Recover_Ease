@@ -38,7 +38,7 @@ def _parse_date(value: str | None) -> datetime | None:
             return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-    raise AppError(422, f"Cannot parse date: {value!r}. Use YYYY-MM-DD format.")
+    raise AppError(f"Cannot parse date: {value!r}. Use YYYY-MM-DD format.", 422)
 
 
 def _task_to_out(task: RecoveryTask) -> TaskResponse:
@@ -71,7 +71,7 @@ async def _get_link(db: AsyncSession, doctor_id: UUID, patient_id: UUID) -> Doct
     )
     link = result.scalar_one_or_none()
     if not link:
-        raise AppError(404, "No active doctor-patient relationship found")
+        raise AppError("No active doctor-patient relationship found", 404)
     return link
 
 
@@ -86,7 +86,7 @@ async def update_care_plan(
     link = await _get_link(db, doctor.id, patient_id)
 
     if body.medications is not None:
-        link.medications = [m.model_dump() for m in body.medications]
+        link.medications = [m.model_dump() for m in body.medications]  # type: ignore[assignment]
     if body.expected_recovery_date is not None:
         link.expected_recovery_date = _parse_date(body.expected_recovery_date)
     if body.recovery_duration is not None:
@@ -187,7 +187,7 @@ async def update_task(
     )
     task = result.scalar_one_or_none()
     if not task:
-        raise AppError(404, "Task not found")
+        raise AppError("Task not found", 404)
 
     if body.title is not None:
         task.title = body.title
@@ -214,7 +214,7 @@ async def delete_task(db: AsyncSession, doctor: User, task_id: UUID) -> None:
     )
     task = result.scalar_one_or_none()
     if not task:
-        raise AppError(404, "Task not found")
+        raise AppError("Task not found", 404)
     await db.delete(task)
     await db.commit()
 
@@ -232,7 +232,7 @@ async def complete_task(
     )
     task = result.scalar_one_or_none()
     if not task:
-        raise AppError(404, "Task not found")
+        raise AppError("Task not found", 404)
 
     task.status = RecoveryTaskStatus.COMPLETED
     task.completed_at = datetime.now(timezone.utc)
@@ -252,7 +252,7 @@ async def undo_task(db: AsyncSession, patient: User, task_id: UUID) -> RecoveryT
     )
     task = result.scalar_one_or_none()
     if not task:
-        raise AppError(404, "Task not found")
+        raise AppError("Task not found", 404)
 
     task.status = RecoveryTaskStatus.PENDING
     task.completed_at = None

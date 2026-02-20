@@ -8,7 +8,7 @@ import { authApi } from "@/api/auth.api";
 import { useStore } from "@/store/useStore";
 import Button from "@/components/Button";
 import Input from "@/components/Input";
-import { ArrowLeft, Heart, UserPlus, Stethoscope, User } from "lucide-react";
+import { ArrowLeft, Heart, UserPlus, Stethoscope, User, Smartphone } from "lucide-react";
 import type { Role } from "@/types";
 
 const schema = z.object({
@@ -16,6 +16,11 @@ const schema = z.object({
     email: z.string().email("Invalid email"),
     password: z.string().min(8, "Min 8 characters"),
     role: z.enum(["PATIENT", "DOCTOR"]),
+    whatsapp_phone: z
+        .string()
+        .regex(/^\+[1-9]\d{6,19}$/, "E.164 format required, e.g. +919876543210")
+        .optional()
+        .or(z.literal("")),
     surgery_type: z.string().optional(),
     surgery_date: z.string().optional(),
     caregiver_email: z.string().email("Invalid email").optional().or(z.literal("")),
@@ -57,6 +62,7 @@ export default function RegisterPage() {
         mutation.mutate({
             ...data,
             role: data.role as Role,
+            whatsapp_phone: data.whatsapp_phone || undefined,
             caregiver_email: data.caregiver_email || undefined,
             surgery_date: data.surgery_date || undefined,
             surgery_type: data.surgery_type || undefined,
@@ -177,6 +183,29 @@ export default function RegisterPage() {
                                     />
                                 </motion.div>
                             )}
+
+                            {/* WhatsApp number — both patients and doctors */}
+                            <div className="rounded-xl p-4 space-y-2" style={{ background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.15)" }}>
+                                <div className="flex items-center gap-1.5">
+                                    <Smartphone className="h-3.5 w-3.5 text-green-400" />
+                                    <span className="text-[11px] font-semibold uppercase tracking-wider text-green-400/70">
+                                        WhatsApp (optional)
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-white/35">
+                                    {role === "PATIENT"
+                                        ? "Log symptoms by texting the bot — no app needed."
+                                        : "Receive instant WhatsApp alerts when a patient escalates."}
+                                    {" "}Format: <span className="text-white/50">+919876543210</span>
+                                </p>
+                                <Input
+                                    label="Phone Number"
+                                    placeholder="+919876543210"
+                                    dark
+                                    {...register("whatsapp_phone")}
+                                    error={errors.whatsapp_phone?.message}
+                                />
+                            </div>
 
                             <Button type="submit" loading={mutation.isPending} className="mt-2 w-full">
                                 <UserPlus className="h-4 w-4" /> Create Account

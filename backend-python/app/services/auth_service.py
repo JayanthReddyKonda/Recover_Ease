@@ -22,11 +22,20 @@ async def register(db: AsyncSession, data: RegisterRequest) -> dict:
     if existing.scalar_one_or_none():
         raise AppError("Email already registered", 409)
 
+    # Prevent two users sharing the same WhatsApp number
+    if data.whatsapp_phone:
+        phone_check = await db.execute(
+            select(User).where(User.whatsapp_phone == data.whatsapp_phone)
+        )
+        if phone_check.scalar_one_or_none():
+            raise AppError("WhatsApp number already linked to another account", 409)
+
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),
         name=data.name,
         role=Role(data.role),
+        whatsapp_phone=data.whatsapp_phone or None,
         surgery_date=data.surgery_date,
         surgery_type=data.surgery_type,
         caregiver_email=data.caregiver_email,
@@ -59,6 +68,16 @@ async def get_me(user: User) -> SafeUser:
 async def update_profile(db: AsyncSession, user: User, data: ProfileUpdateRequest) -> SafeUser:
     """Update mutable profile fields."""
     update_data = data.model_dump(exclude_unset=True)
+
+    # Prevent stealing another account's WhatsApp number
+    new_phone = update_data.get("whatsapp_phone")
+    if new_phone and new_phone != user.whatsapp_phone:
+        conflict = await db.execute(
+            select(User).where(User.whatsapp_phone == new_phone)
+        )
+        if conflict.scalar_one_or_none():
+            raise AppError("WhatsApp number already linked to another account", 409)
+
     for key, value in update_data.items():
         setattr(user, key, value)
 
