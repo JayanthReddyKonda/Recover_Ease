@@ -21,7 +21,7 @@ class EscalationResponse(BaseModel):
     doctor_id: UUID | None
     severity: str
     status: str
-    rule_results: dict[str, Any] | None
+    rule_results: list[dict[str, Any]] | dict[str, Any] | None
     ai_verdict: dict[str, Any] | None
     is_sos: bool
     doctor_notes: str | None

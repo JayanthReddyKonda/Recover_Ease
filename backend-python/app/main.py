@@ -1,5 +1,5 @@
 """
-FastAPI application entry point.
+FastAPI application entry point — production-ready.
 """
 
 from __future__ import annotations
@@ -8,11 +8,11 @@ import time
 from contextlib import asynccontextmanager
 
 import socketio
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
 from app.core.database import engine
@@ -39,11 +39,11 @@ async def lifespan(app: FastAPI):
     setup_logging()
     logger.info("starting", port=settings.port, env=settings.node_env)
 
-    # Create tables (dev only — use Alembic in production)
-    if not settings.is_production:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("database_tables_synced")
+    # Create tables — safe for both dev and production
+    # (create_all is idempotent — skips existing tables)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("database_tables_synced")
 
     # Verify Redis
     try:
@@ -51,6 +51,14 @@ async def lifespan(app: FastAPI):
         logger.info("redis_connected")
     except Exception as e:
         logger.warning("redis_unavailable", error=str(e))
+
+    # Log config summary (no secrets)
+    logger.info(
+        "app_ready",
+        cors=settings.cors_origin,
+        resend_enabled=settings.resend_enabled,
+        groq_model=settings.groq_model,
+    )
 
     yield
 
@@ -67,6 +75,8 @@ def create_app() -> socketio.ASGIApp:
         version="1.0.0",
         description="Post-discharge patient recovery monitoring",
         lifespan=lifespan,
+        docs_url="/docs" if not settings.is_production else None,
+        redoc_url=None,
     )
 
     # ── Middleware ───────────────────────────────────
@@ -74,25 +84,27 @@ def create_app() -> socketio.ASGIApp:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if "*" in origins else origins,
-        allow_credentials="*" not in origins,  # credentials can't be used with wildcard
+        allow_credentials="*" not in origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # Rate limiter
+    # Rate limiter -- applied as middleware to ALL routes
     app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # Custom error handlers
     register_exception_handlers(app)
 
     # ── Health Check ────────────────────────────────
-    @app.get("/health")
+    @app.get("/health", tags=["Health"])
     async def health():
         return {
             "status": "healthy",
             "timestamp": time.time(),
             "uptime": round(time.time() - START_TIME, 2),
+            "environment": settings.node_env,
         }
 
     # ── API Routes ──────────────────────────────────

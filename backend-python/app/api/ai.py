@@ -1,16 +1,15 @@
 """
-AI routes — direct AI endpoints for patient insight + doctor summary.
+AI routes -- direct AI endpoints for patient insight + doctor summary.
 """
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
 from app.api.deps import DbSession
 from app.middleware.auth import DoctorUser, PatientUser
-from app.middleware.rate_limiter import AI_LIMIT, limiter
 from app.schemas.common import ApiResponse
 from app.services import groq_service, symptom_service
 
@@ -18,8 +17,7 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 
 
 @router.get("/insight")
-@limiter.limit(AI_LIMIT)
-async def get_patient_insight(request: Request, patient: PatientUser, db: DbSession):
+async def get_patient_insight(patient: PatientUser, db: DbSession):
     """Get AI-generated insight for the current patient."""
     logs = await symptom_service.get_logs(db, patient.id, limit=7)
     if not logs:
@@ -45,8 +43,7 @@ async def get_patient_insight(request: Request, patient: PatientUser, db: DbSess
 
 
 @router.get("/summary/{patient_id}")
-@limiter.limit(AI_LIMIT)
-async def get_doctor_summary(request: Request, patient_id: UUID, doctor: DoctorUser, db: DbSession):
+async def get_doctor_summary(patient_id: UUID, doctor: DoctorUser, db: DbSession):
     """Get AI-generated clinical summary for a specific patient (doctor only)."""
     # Verify doctor access
     from sqlalchemy import select

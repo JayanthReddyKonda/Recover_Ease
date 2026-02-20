@@ -21,6 +21,8 @@ from app.models.models import (
     User,
 )
 from app.schemas.common import SafeUser
+from app.schemas.patient import EscalationResponse, MilestoneResponse
+from app.schemas.symptom import SymptomLogResponse
 from app.services import email_service, escalation_service, groq_service, recovery_service
 
 
@@ -62,8 +64,8 @@ async def get_patient_profile(db: AsyncSession, patient: User) -> dict[str, Any]
     return {
         "user": SafeUser.model_validate(patient),
         "log_count": log_count,
-        "latest_log": latest_log,
-        "milestones": milestones,
+        "latest_log": SymptomLogResponse.model_validate(latest_log) if latest_log else None,
+        "milestones": [MilestoneResponse.model_validate(m) for m in milestones],
         "recovery_stage": recovery_service.get_recovery_stage(patient.surgery_date),
     }
 
@@ -117,9 +119,9 @@ async def get_patient_full(db: AsyncSession, doctor: User, patient_id: UUID) -> 
 
     return {
         "user": SafeUser.model_validate(patient),
-        "logs": logs,
-        "escalations": escalations,
-        "milestones": milestones,
+        "logs": [SymptomLogResponse.model_validate(l) for l in logs],
+        "escalations": [EscalationResponse.model_validate(e) for e in escalations],
+        "milestones": [MilestoneResponse.model_validate(m) for m in milestones],
         "recovery_stage": recovery_service.get_recovery_stage(patient.surgery_date),
         "ai_summary": ai_summary,
     }

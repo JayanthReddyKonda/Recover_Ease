@@ -1,32 +1,32 @@
-# ── Recovery Companion — Full Docker Stack ──────────
+# -- Recovery Companion -- Full Docker Stack --
 # Usage:
-#   1. Copy .env.docker to .env.docker.local and fill in your keys
-#   2. docker compose -f docker-compose.yml up --build -d
+#   1. Copy .env.docker, fill in your real keys
+#   2. docker compose --env-file .env.docker up --build -d
 #   3. Check ngrok URL: docker compose logs ngrok | grep "url="
 #   4. Your API is publicly accessible at that URL
-# ──────────────────────────────────────────────────────
+# -------------------------------------------------------
 
 services:
-  # ── PostgreSQL ──────────────────────────────────────
+  # -- PostgreSQL --
   postgres:
     image: postgres:16-alpine
     container_name: rc_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-rc_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rc_password}
-      POSTGRES_DB: ${POSTGRES_DB:-recovery_companion}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - rc_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rc_user} -d ${POSTGRES_DB:-recovery_companion}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
       - rc_network
 
-  # ── Redis ───────────────────────────────────────────
+  # -- Redis --
   redis:
     image: redis:7-alpine
     container_name: rc_redis
@@ -42,7 +42,7 @@ services:
     networks:
       - rc_network
 
-  # ── FastAPI Backend ─────────────────────────────────
+  # -- FastAPI Backend --
   backend:
     build:
       context: .
@@ -50,14 +50,14 @@ services:
     container_name: rc_backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rc_user}:${POSTGRES_PASSWORD:-rc_password}@postgres:5432/${POSTGRES_DB:-recovery_companion}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET:-change_me_to_a_32_char_random_string!!}
-      JWT_ALGORITHM: HS256
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
-      GROQ_API_KEY: ${GROQ_API_KEY:-gsk_placeholder_replace_with_real_key}
+      GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
-      RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder_replace_with_real_key}
+      RESEND_API_KEY: ${RESEND_API_KEY}
       RESEND_FROM: ${RESEND_FROM:-Recovery Companion <onboarding@resend.dev>}
       PORT: 8000
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
@@ -78,7 +78,7 @@ services:
     networks:
       - rc_network
 
-  # ── Ngrok Tunnel ────────────────────────────────────
+  # -- Ngrok Tunnel --
   # Exposes the backend to the internet via a public URL
   ngrok:
     image: ngrok/ngrok:latest

@@ -1,17 +1,24 @@
 """
 Email service — using Resend for caregiver & SOS alerts.
+Degrades gracefully when Resend key is a placeholder — logs instead of sending.
 """
 
 from __future__ import annotations
 
 import asyncio
 
-import resend
-
 from app.core.config import settings
 from app.core.logger import logger
 
-resend.api_key = settings.resend_api_key
+# Only import & configure resend if we have a real key
+_RESEND_READY = False
+if settings.resend_enabled:
+    try:
+        import resend
+        resend.api_key = settings.resend_api_key
+        _RESEND_READY = True
+    except ImportError:
+        logger.warning("resend_package_missing", msg="pip install resend — emails disabled")
 
 
 async def send_caregiver_alert(
@@ -20,10 +27,14 @@ async def send_caregiver_alert(
     severity: str,
     details: str,
 ) -> bool:
-    """Send an alert email to the patient's caregiver."""
+    """Send an alert email to the patient's caregiver. Never raises."""
+    if not _RESEND_READY:
+        logger.info("email_skipped_no_key", to=caregiver_email, patient=patient_name, severity=severity)
+        return False
+
     try:
         await asyncio.to_thread(
-            resend.Emails.send,
+            resend.Emails.send,  # type: ignore[name-defined]
             {
                 "from": settings.resend_from,
                 "to": [caregiver_email],
@@ -49,10 +60,14 @@ async def send_sos_alert(
     patient_name: str,
     notes: str | None = None,
 ) -> bool:
-    """Send an SOS alert email to the assigned doctor."""
+    """Send an SOS alert email to the assigned doctor. Never raises."""
+    if not _RESEND_READY:
+        logger.info("email_skipped_no_key", to=doctor_email, patient=patient_name, type="sos")
+        return False
+
     try:
         await asyncio.to_thread(
-            resend.Emails.send,
+            resend.Emails.send,  # type: ignore[name-defined]
             {
                 "from": settings.resend_from,
                 "to": [doctor_email],
