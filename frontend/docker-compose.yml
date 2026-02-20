@@ -1,0 +1,21 @@
+# Recovery Companion — Frontend only
+# Run independently from the backend stack.
+# Backend must be reachable at the ngrok URL below.
+#
+# Usage:
+#   docker compose up --build -d
+#   Open http://localhost:3000
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-https://sun-unupset-pursuingly.ngrok-free.dev/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://sun-unupset-pursuingly.ngrok-free.dev}
+    image: rc_frontend:latest
+    container_name: rc_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"

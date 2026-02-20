@@ -57,6 +57,11 @@ export default function PatientDetailPage() {
     const [cpDuration, setCpDuration] = useState("");
     const [cpNotes, setCpNotes] = useState("");
 
+    // ── Surgery details state ────────────────────────
+    const [showSurgeryModal, setShowSurgeryModal] = useState(false);
+    const [surgeryType, setSurgeryType] = useState("");
+    const [surgeryDate, setSurgeryDate] = useState("");
+
     // ── Task state ───────────────────────────────────
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [editTask, setEditTask] = useState<RecoveryTask | null>(null);
@@ -143,6 +148,17 @@ export default function PatientDetailPage() {
         onSuccess: () => {
             addToast("info", "Deleted", "Task removed");
             qc.invalidateQueries({ queryKey: ["doctor-tasks", id] });
+        },
+        onError: (e: Error) => addToast("error", "Failed", e.message),
+    });
+
+    const updateSurgeryMut = useMutation({
+        mutationFn: ({ type, date }: { type: string; date: string }) =>
+            patientApi.updateSurgeryDetails(id!, type, date),
+        onSuccess: () => {
+            addToast("success", "Saved", "Surgery details updated");
+            qc.invalidateQueries({ queryKey: ["patient-full", id] });
+            setShowSurgeryModal(false);
         },
         onError: (e: Error) => addToast("error", "Failed", e.message),
     });
@@ -260,6 +276,40 @@ export default function PatientDetailPage() {
                         <p className="text-sm text-primary-100">{p.recovery_stage.description}</p>
                     </Card>
                 )}
+
+                {/* Surgery Details Card (doctor-editable) */}
+                <Card>
+                    <div className="flex items-center justify-between mb-2">
+                        <h2 className="section-heading flex items-center gap-2">
+                            <Stethoscope className="h-4 w-4 text-primary-500" /> Surgery Details
+                        </h2>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                                setSurgeryType(p.user.surgery_type ?? "");
+                                setSurgeryDate(p.user.surgery_date ? p.user.surgery_date.split("T")[0] : "");
+                                setShowSurgeryModal(true);
+                            }}
+                        >
+                            <Edit2 className="mr-1 h-3.5 w-3.5" /> Edit
+                        </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <p className="text-xs text-gray-400 mb-0.5">Surgery Type</p>
+                            <p className="text-sm font-medium text-gray-800">{p.user.surgery_type || <span className="text-gray-400 italic">Not set</span>}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-400 mb-0.5">Surgery Date</p>
+                            <p className="text-sm font-medium text-gray-800">
+                                {p.user.surgery_date
+                                    ? format(parseISO(p.user.surgery_date), "dd MMM yyyy")
+                                    : <span className="text-gray-400 italic">Not set</span>}
+                            </p>
+                        </div>
+                    </div>
+                </Card>
 
                 {/* ── Care Plan Row ─────────────────────────────── */}
                 <div className="grid gap-4 lg:grid-cols-2">
@@ -382,10 +432,10 @@ export default function PatientDetailPage() {
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     className={`flex items-start justify-between rounded-xl border p-3 transition-all ${t.status === "COMPLETED"
-                                            ? "border-emerald-100 bg-emerald-50/60 opacity-75"
-                                            : !t.is_active
-                                                ? "border-gray-100 bg-gray-50 opacity-60"
-                                                : "border-gray-100 bg-white"
+                                        ? "border-emerald-100 bg-emerald-50/60 opacity-75"
+                                        : !t.is_active
+                                            ? "border-gray-100 bg-gray-50 opacity-60"
+                                            : "border-gray-100 bg-white"
                                         }`}
                                 >
                                     <div className="flex gap-3 min-w-0">
@@ -793,6 +843,39 @@ export default function PatientDetailPage() {
                             </div>
                         </div>
                     )}
+                </Modal>
+
+                {/* ── Surgery Details Modal ─────────────────────── */}
+                <Modal
+                    open={showSurgeryModal}
+                    onClose={() => setShowSurgeryModal(false)}
+                    title="Edit Surgery Details"
+                >
+                    <div className="space-y-4">
+                        <Input
+                            label="Surgery Type"
+                            placeholder="e.g. Knee replacement"
+                            value={surgeryType}
+                            onChange={(e) => setSurgeryType(e.target.value)}
+                        />
+                        <Input
+                            label="Surgery Date"
+                            type="date"
+                            value={surgeryDate}
+                            onChange={(e) => setSurgeryDate(e.target.value)}
+                        />
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setShowSurgeryModal(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                loading={updateSurgeryMut.isPending}
+                                onClick={() => updateSurgeryMut.mutate({ type: surgeryType, date: surgeryDate })}
+                            >
+                                Save
+                            </Button>
+                        </div>
+                    </div>
                 </Modal>
             </div>
         </PageTransition>

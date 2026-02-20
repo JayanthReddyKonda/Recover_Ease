@@ -21,8 +21,6 @@ const schema = z.object({
         .regex(/^\+[1-9]\d{6,19}$/, "E.164 format required, e.g. +919876543210")
         .optional()
         .or(z.literal("")),
-    surgery_type: z.string().optional(),
-    surgery_date: z.string().optional(),
     caregiver_email: z.string().email("Invalid email").optional().or(z.literal("")),
 });
 
@@ -64,8 +62,6 @@ export default function RegisterPage() {
             role: data.role as Role,
             whatsapp_phone: data.whatsapp_phone || undefined,
             caregiver_email: data.caregiver_email || undefined,
-            surgery_date: data.surgery_date || undefined,
-            surgery_type: data.surgery_type || undefined,
         });
     };
 
@@ -170,9 +166,7 @@ export default function RegisterPage() {
                                     className="space-y-3 rounded-xl p-4"
                                     style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
                                 >
-                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/30">Surgery Details (optional)</p>
-                                    <Input label="Surgery Type" placeholder="e.g. Knee replacement" dark {...register("surgery_type")} />
-                                    <Input label="Surgery Date" type="date" dark {...register("surgery_date")} />
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/30">Caregiver (optional)</p>
                                     <Input
                                         label="Caregiver Email"
                                         type="email"

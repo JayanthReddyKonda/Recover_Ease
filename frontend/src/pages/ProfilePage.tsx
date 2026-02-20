@@ -19,8 +19,6 @@ import type { DoctorLink, ProfileUpdateRequest } from "@/types";
 
 const profileSchema = z.object({
     name: z.string().min(1),
-    surgery_type: z.string().optional(),
-    surgery_date: z.string().optional(),
     caregiver_email: z.string().email().optional().or(z.literal("")),
     whatsapp_phone: z
         .string()
@@ -53,8 +51,6 @@ export default function ProfilePage() {
         values: user
             ? {
                 name: user.name,
-                surgery_type: user.surgery_type ?? "",
-                surgery_date: user.surgery_date ?? "",
                 caregiver_email: user.caregiver_email ?? "",
                 whatsapp_phone: user.whatsapp_phone ?? "",
             }
@@ -133,8 +129,6 @@ export default function ProfilePage() {
                         onSubmit={handleSubmit((d) =>
                             updateMut.mutate({
                                 name: d.name,
-                                surgery_type: d.surgery_type || null,
-                                surgery_date: d.surgery_date || null,
                                 caregiver_email: d.caregiver_email || null,
                                 whatsapp_phone: d.whatsapp_phone || null,
                             }),
@@ -143,16 +137,13 @@ export default function ProfilePage() {
                     >
                         <Input label="Full Name" {...register("name")} error={errors.name?.message} />
                         {user?.role === "PATIENT" && (
-                            <>
-                                <Input label="Surgery Type" {...register("surgery_type")} />
-                                <Input label="Surgery Date" type="date" {...register("surgery_date")} />
-                                <Input
-                                    label="Caregiver Email"
-                                    type="email"
-                                    {...register("caregiver_email")}
-                                    error={errors.caregiver_email?.message}
-                                />
-                            </>
+                            <Input
+                                label="Caregiver Email"
+                                type="email"
+                                placeholder="caregiver@example.com"
+                                {...register("caregiver_email")}
+                                error={errors.caregiver_email?.message}
+                            />
                         )}
 
                         {/* WhatsApp phone — shown for both patients and doctors */}

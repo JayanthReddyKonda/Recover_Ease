@@ -58,6 +58,11 @@ class TreatmentStatusBody(BaseModel):
     is_active: bool
 
 
+class SurgeryDetailsBody(BaseModel):
+    surgery_type: str | None = None
+    surgery_date: str | None = None  # ISO date string e.g. "2026-01-15"
+
+
 @router.patch("/{patient_id}/treatment-status", response_model=ApiResponse[None])
 async def set_treatment_status(
     patient_id: UUID,
@@ -69,3 +74,15 @@ async def set_treatment_status(
     await patient_service.set_treatment_status(db, doctor, patient_id, body.is_active)
     status_label = "active treatment" if body.is_active else "recovered"
     return ApiResponse(message=f"Patient marked as {status_label}")
+
+
+@router.patch("/{patient_id}/surgery-details", response_model=ApiResponse[None])
+async def update_surgery_details(
+    patient_id: UUID,
+    body: SurgeryDetailsBody,
+    doctor: DoctorUser,
+    db: DbSession,
+):
+    """Doctor sets or updates surgery type and date on a patient's profile."""
+    await patient_service.update_surgery_details(db, doctor, patient_id, body.surgery_type, body.surgery_date)
+    return ApiResponse(message="Surgery details updated")

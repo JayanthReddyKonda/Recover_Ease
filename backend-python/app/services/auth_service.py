@@ -36,8 +36,6 @@ async def register(db: AsyncSession, data: RegisterRequest) -> dict:
         name=data.name,
         role=Role(data.role),
         whatsapp_phone=data.whatsapp_phone or None,
-        surgery_date=data.surgery_date,
-        surgery_type=data.surgery_type,
         caregiver_email=data.caregiver_email,
     )
     db.add(user)

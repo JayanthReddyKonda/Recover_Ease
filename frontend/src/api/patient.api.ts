@@ -38,4 +38,13 @@ export const patientApi = {
                 is_active: isActive,
             })
             .then((r) => r.data),
+
+    /** Doctor sets surgery type + date on a patient's profile */
+    updateSurgeryDetails: (patientId: string, surgery_type: string | null, surgery_date: string | null) =>
+        api
+            .patch<ApiResponse<null>>(`/patients/${patientId}/surgery-details`, {
+                surgery_type: surgery_type || null,
+                surgery_date: surgery_date || null,
+            })
+            .then((r) => r.data),
 };

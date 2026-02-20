@@ -45,6 +45,21 @@ async def _verify_doctor_access(db: AsyncSession, doctor: User, patient_id: UUID
     return patient
 
 
+async def update_surgery_details(
+    db: AsyncSession,
+    doctor: User,
+    patient_id: UUID,
+    surgery_type: str | None,
+    surgery_date: str | None,
+) -> None:
+    """Doctor sets surgery_type and surgery_date on a patient's User record."""
+    from datetime import datetime as dt
+    patient = await _verify_doctor_access(db, doctor, patient_id)
+    patient.surgery_type = surgery_type or None
+    patient.surgery_date = dt.fromisoformat(surgery_date) if surgery_date else None
+    await db.flush()
+
+
 async def get_patient_profile(db: AsyncSession, patient: User) -> dict[str, Any]:
     """Get a patient's own profile with stats."""
     # Log count

@@ -51,8 +51,6 @@ services:
       JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
       GROQ_API_KEY: ${GROQ_API_KEY}
       GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
-      RESEND_API_KEY: ${RESEND_API_KEY}
-      RESEND_FROM: ${RESEND_FROM:-Recovery Companion <onboarding@resend.dev>}
       WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-recovery_companion_whatsapp}
@@ -75,24 +73,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
-    networks:
-      - rc_network
-
-  # -- Frontend (nginx) --
-  frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-}
-    container_name: rc_frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      backend:
-        condition: service_healthy
     networks:
       - rc_network
 
