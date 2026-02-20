@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import DbSession
 from app.middleware.auth import CurrentUser, DoctorUser, PatientUser
-from app.schemas.common import ApiResponse, DoctorLink, SafeUser
+from app.schemas.common import ApiResponse, DoctorLink, PatientWithStatus, SafeUser
 from app.schemas.request import RequestResponse, SendRequestBody
 from app.services import request_service
 
@@ -57,7 +57,7 @@ async def get_my_doctors(patient: PatientUser, db: DbSession):
     return ApiResponse(data=doctors)
 
 
-@router.get("/my-patients", response_model=ApiResponse[list[SafeUser]])
+@router.get("/my-patients", response_model=ApiResponse[list[PatientWithStatus]])
 async def get_my_patients(doctor: DoctorUser, db: DbSession):
     patients = await request_service.get_my_patients(db, doctor)
     return ApiResponse(data=patients)

@@ -42,6 +42,12 @@ class SafeUser(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PatientWithStatus(SafeUser):
+    """SafeUser extended with treatment-link fields returned by GET /requests/my-patients."""
+    is_active: bool
+    link_id: str
+
+
 class DoctorLink(BaseModel):
     """A doctor linked to a patient (from DoctorPatient junction)."""
     link_id: UUID

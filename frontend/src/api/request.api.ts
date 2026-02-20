@@ -1,5 +1,5 @@
 import api from "./axios";
-import type { ApiResponse, DoctorLink, MedicationInput, RequestResponse, SafeUser } from "@/types";
+import type { ApiResponse, DoctorLink, MedicationInput, PatientWithStatus, RequestResponse, SafeUser } from "@/types";
 
 export const requestApi = {
     sendRequest: (payload: {
@@ -35,10 +35,10 @@ export const requestApi = {
             .get<ApiResponse<DoctorLink[]>>("/requests/my-doctors")
             .then((r) => r.data),
 
-    /** Doctor: get all linked patients */
+    /** Doctor: get all linked patients (includes is_active + link_id) */
     getMyPatients: () =>
         api
-            .get<ApiResponse<SafeUser[]>>("/requests/my-patients")
+            .get<ApiResponse<PatientWithStatus[]>>("/requests/my-patients")
             .then((r) => r.data),
 
     /** Look up a user by their 6-char connect code */

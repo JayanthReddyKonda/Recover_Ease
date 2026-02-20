@@ -55,6 +55,35 @@ def _link_to_response(link: DoctorPatient) -> CarePlanResponse:
     )
 
 
+# ─── Patient: view + complete tasks (MUST be before /{patient_id} routes) ────
+# FastAPI matches routes in declaration order. If /{patient_id}/tasks came first,
+# /my/tasks would match it with patient_id="my" → UUID parse → 422 error.
+
+@router.get("/my/plans", response_model=ApiResponse[list[CarePlanResponse]])
+async def get_my_care_plans(patient: PatientUser, db: DbSession):
+    """Patient sees care plans from all their doctors."""
+    links = await care_plan_service.get_patient_care_plan_for_patient(db, patient.id)
+    return ApiResponse(data=[_link_to_response(l) for l in links])
+
+
+@router.get("/my/tasks", response_model=ApiResponse[list[TaskResponse]])
+async def get_my_tasks(patient: PatientUser, db: DbSession):
+    tasks = await care_plan_service.list_tasks(db, patient.id, active_only=True)
+    return ApiResponse(data=[care_plan_service._task_to_out(t) for t in tasks])
+
+
+@router.post("/my/tasks/{task_id}/complete", response_model=ApiResponse[TaskResponse])
+async def complete_task(task_id: UUID, body: CompleteTaskBody, patient: PatientUser, db: DbSession):
+    task = await care_plan_service.complete_task(db, patient, task_id, body)
+    return ApiResponse(data=care_plan_service._task_to_out(task), message="Task completed!")
+
+
+@router.post("/my/tasks/{task_id}/undo", response_model=ApiResponse[TaskResponse])
+async def undo_task(task_id: UUID, patient: PatientUser, db: DbSession):
+    task = await care_plan_service.undo_task(db, patient, task_id)
+    return ApiResponse(data=care_plan_service._task_to_out(task), message="Task reset to pending")
+
+
 # ─── Doctor: care plan management ───────────────────
 
 @router.get("/{patient_id}", response_model=ApiResponse[CarePlanResponse])
@@ -101,30 +130,3 @@ async def update_task(
 async def delete_task(patient_id: UUID, task_id: UUID, doctor: DoctorUser, db: DbSession):
     await care_plan_service.delete_task(db, doctor, task_id)
     return ApiResponse(data=None, message="Task deleted")
-
-
-# ─── Patient: view + complete tasks ─────────────────
-
-@router.get("/my/plans", response_model=ApiResponse[list[CarePlanResponse]])
-async def get_my_care_plans(patient: PatientUser, db: DbSession):
-    """Patient sees care plans from all their doctors."""
-    links = await care_plan_service.get_patient_care_plan_for_patient(db, patient.id)
-    return ApiResponse(data=[_link_to_response(l) for l in links])
-
-
-@router.get("/my/tasks", response_model=ApiResponse[list[TaskResponse]])
-async def get_my_tasks(patient: PatientUser, db: DbSession):
-    tasks = await care_plan_service.list_tasks(db, patient.id, active_only=True)
-    return ApiResponse(data=[care_plan_service._task_to_out(t) for t in tasks])
-
-
-@router.post("/my/tasks/{task_id}/complete", response_model=ApiResponse[TaskResponse])
-async def complete_task(task_id: UUID, body: CompleteTaskBody, patient: PatientUser, db: DbSession):
-    task = await care_plan_service.complete_task(db, patient, task_id, body)
-    return ApiResponse(data=care_plan_service._task_to_out(task), message="Task completed!")
-
-
-@router.post("/my/tasks/{task_id}/undo", response_model=ApiResponse[TaskResponse])
-async def undo_task(task_id: UUID, patient: PatientUser, db: DbSession):
-    task = await care_plan_service.undo_task(db, patient, task_id)
-    return ApiResponse(data=care_plan_service._task_to_out(task), message="Task reset to pending")

@@ -79,6 +79,9 @@ async def update_profile(db: AsyncSession, user: User, data: ProfileUpdateReques
             raise AppError("WhatsApp number already linked to another account", 409)
 
     for key, value in update_data.items():
+        # Coerce empty string phone to NULL so webhook lookups work correctly
+        if key == "whatsapp_phone" and value == "":
+            value = None
         setattr(user, key, value)
 
     await db.flush()
