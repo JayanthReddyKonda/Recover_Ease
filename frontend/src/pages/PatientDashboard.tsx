@@ -232,11 +232,10 @@ export default function PatientDashboard() {
                             <div className="space-y-2">
                                 {myTasks.data!.map((t) => (
                                     <div key={t.id}
-                                        className={`flex items-start justify-between rounded-xl border p-3 transition-all ${
-                                            t.status === "COMPLETED"
+                                        className={`flex items-start justify-between rounded-xl border p-3 transition-all ${t.status === "COMPLETED"
                                                 ? "border-emerald-100 bg-emerald-50/60"
                                                 : "border-gray-100 bg-white"
-                                        }`}
+                                            }`}
                                     >
                                         <div className="flex gap-3 min-w-0">
                                             <button
@@ -256,9 +255,8 @@ export default function PatientDashboard() {
                                                 )}
                                             </button>
                                             <div className="min-w-0">
-                                                <p className={`text-sm font-medium ${
-                                                    t.status === "COMPLETED" ? "line-through text-gray-400" : "text-gray-900"
-                                                }`}>
+                                                <p className={`text-sm font-medium ${t.status === "COMPLETED" ? "line-through text-gray-400" : "text-gray-900"
+                                                    }`}>
                                                     {t.title}
                                                 </p>
                                                 {t.description && (

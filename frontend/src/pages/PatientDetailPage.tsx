@@ -381,18 +381,16 @@ export default function PatientDetailPage() {
                                     key={t.id}
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className={`flex items-start justify-between rounded-xl border p-3 transition-all ${
-                                        t.status === "COMPLETED"
+                                    className={`flex items-start justify-between rounded-xl border p-3 transition-all ${t.status === "COMPLETED"
                                             ? "border-emerald-100 bg-emerald-50/60 opacity-75"
                                             : !t.is_active
                                                 ? "border-gray-100 bg-gray-50 opacity-60"
                                                 : "border-gray-100 bg-white"
-                                    }`}
+                                        }`}
                                 >
                                     <div className="flex gap-3 min-w-0">
-                                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                                            t.status === "COMPLETED" ? "bg-emerald-100" : "bg-gray-100"
-                                        }`}>
+                                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${t.status === "COMPLETED" ? "bg-emerald-100" : "bg-gray-100"
+                                            }`}>
                                             {t.status === "COMPLETED"
                                                 ? <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
                                                 : <Target className="h-3.5 w-3.5 text-gray-400" />
