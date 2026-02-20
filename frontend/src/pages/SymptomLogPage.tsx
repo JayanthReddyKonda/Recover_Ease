@@ -218,7 +218,17 @@ export default function SymptomLogPage() {
             <div className="mx-auto max-w-lg space-y-6">
                 <h1 className="page-heading">Log Symptoms</h1>
 
-                <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-5">
+                <form
+                    onSubmit={handleSubmit((d) => mutation.mutate(d))}
+                    onKeyDown={(e) => {
+                        // Prevent accidental form submission when pressing Enter on
+                        // sliders, number inputs, or textareas — only the submit button should fire
+                        if (e.key === "Enter" && (e.target as HTMLElement).tagName !== "BUTTON") {
+                            e.preventDefault();
+                        }
+                    }}
+                    className="space-y-5"
+                >
                     <Card>
                         <div className="space-y-5">
                             <Controller
