@@ -35,10 +35,6 @@ async def send_text(phone: str, message: str) -> bool:
     """
     Send a plain-text WhatsApp message to the given E.164 phone number.
     Returns True on success, False when disabled or on error.
-
-    NOTE: In Meta test/sandbox accounts, free-form text can only be sent within
-    a 24-hour window AFTER the recipient has messaged the business number first.
-    For business-initiated doctor alerts use send_template() instead.
     """
     if not settings.whatsapp_enabled:
         logger.info("whatsapp_disabled_skip_send", phone_prefix=phone[:6])
@@ -66,122 +62,6 @@ async def send_text(phone: str, message: str) -> bool:
     except Exception as e:
         logger.error("whatsapp_send_failed", phone_prefix=phone[:6], error=str(e))
         return False
-
-
-async def send_template(phone: str, template_name: str, lang: str = "en_US",
-                        components: list | None = None) -> bool:
-    """
-    Send a pre-approved WhatsApp template message (works without a 24h session window).
-    Use this for business-initiated alerts (doctor SOS/escalation notifications).
-
-    Meta provides 'hello_world' on every test account. For production, create a
-    custom template in Meta Business Suite → WhatsApp Manager → Message Templates.
-    """
-    if not settings.whatsapp_enabled:
-        return False
-
-    url = f"{_GRAPH_URL}/{settings.whatsapp_phone_number_id}/messages"
-    template_payload: dict = {
-        "name": template_name,
-        "language": {"code": lang},
-    }
-    if components:
-        template_payload["components"] = components
-
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone,
-        "type": "template",
-        "template": template_payload,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json=payload, headers=_headers())
-            body = resp.text
-            if resp.status_code == 200:
-                logger.info("whatsapp_template_sent", phone_prefix=phone[:6],
-                            template=template_name)
-                return True
-            else:
-                logger.error("whatsapp_template_error", phone_prefix=phone[:6],
-                             status=resp.status_code, body=body[:300])
-                return False
-    except Exception as e:
-        logger.error("whatsapp_template_failed", phone_prefix=phone[:6], error=str(e))
-        return False
-
-
-def _body_component(*params: str) -> list:
-    """Build a template body component with positional parameters."""
-    return [{
-        "type": "body",
-        "parameters": [{"type": "text", "text": str(p)} for p in params],
-    }]
-
-
-async def send_sos_template(phone: str, patient_name: str, notes: str) -> bool:
-    """
-    Send the recoverease_sos_alert template to a doctor.
-    Template variables: {{1}}=patient_name  {{2}}=notes
-    Falls back to hello_world if the custom template is not yet approved.
-    """
-    sent = await send_template(
-        phone,
-        "recoverease_sos_alert",
-        components=_body_component(patient_name, notes or "No details provided"),
-    )
-    if not sent:
-        logger.info("whatsapp_sos_template_fallback", phone_prefix=phone[:6])
-        sent = await send_template(phone, "hello_world")
-    return sent
-
-
-async def send_escalation_template(
-    phone: str,
-    patient_name: str,
-    severity: str,
-    pain: int | float,
-    sleep: int | float,
-    mood: int | float,
-    reason: str,
-) -> bool:
-    """
-    Send the recoverease_escalation_alert template to a doctor.
-    Template variables:
-      {{1}}=patient_name  {{2}}=severity  {{3}}=pain
-      {{4}}=sleep         {{5}}=mood      {{6}}=reason
-    Falls back to hello_world if the custom template is not yet approved.
-    """
-    sent = await send_template(
-        phone,
-        "recoverease_escalation_alert",
-        components=_body_component(
-            patient_name,
-            severity.upper(),
-            str(int(pain)),
-            f"{float(sleep):.1f}",
-            str(int(mood)),
-            reason,
-        ),
-    )
-    if not sent:
-        logger.info("whatsapp_escalation_template_fallback", phone_prefix=phone[:6])
-        sent = await send_template(phone, "hello_world")
-    return sent
-
-
-async def send_doctor_alert(phone: str, message: str) -> bool:
-    """
-    Send a free-text alert to a doctor (works only within a 24h session window).
-    Falls back to hello_world template if session is not active.
-    Use send_sos_template / send_escalation_template for guaranteed delivery.
-    """
-    sent = await send_text(phone, message)
-    if not sent:
-        logger.info("whatsapp_falling_back_to_template", phone_prefix=phone[:6])
-        sent = await send_template(phone, "hello_world")
-    return sent
 
 
 def build_log_confirmation(

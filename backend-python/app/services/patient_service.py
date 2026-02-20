@@ -217,11 +217,14 @@ async def trigger_sos(
                 )
             # WhatsApp alert to doctor
             if doctor.whatsapp_phone:
-                await whatsapp_service.send_sos_template(
-                    doctor.whatsapp_phone,
-                    patient_name=patient.name,
-                    notes=notes or "No details provided",
+                sos_msg = (
+                    f"🚨 *SOS ALERT — RecoverEase*\n"
+                    f"Patient: *{patient.name}*\n"
+                    f"Severity: CRITICAL\n"
+                    f"Message: {notes or 'No details provided'}\n"
+                    f"👉 Open your RecoverEase dashboard immediately."
                 )
+                await whatsapp_service.send_text(doctor.whatsapp_phone, sos_msg)
 
     if patient.caregiver_email:
         await email_service.send_caregiver_alert(
