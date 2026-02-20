@@ -112,14 +112,73 @@ async def send_template(phone: str, template_name: str, lang: str = "en_US",
         return False
 
 
+def _body_component(*params: str) -> list:
+    """Build a template body component with positional parameters."""
+    return [{
+        "type": "body",
+        "parameters": [{"type": "text", "text": str(p)} for p in params],
+    }]
+
+
+async def send_sos_template(phone: str, patient_name: str, notes: str) -> bool:
+    """
+    Send the recoverease_sos_alert template to a doctor.
+    Template variables: {{1}}=patient_name  {{2}}=notes
+    Falls back to hello_world if the custom template is not yet approved.
+    """
+    sent = await send_template(
+        phone,
+        "recoverease_sos_alert",
+        components=_body_component(patient_name, notes or "No details provided"),
+    )
+    if not sent:
+        logger.info("whatsapp_sos_template_fallback", phone_prefix=phone[:6])
+        sent = await send_template(phone, "hello_world")
+    return sent
+
+
+async def send_escalation_template(
+    phone: str,
+    patient_name: str,
+    severity: str,
+    pain: int | float,
+    sleep: int | float,
+    mood: int | float,
+    reason: str,
+) -> bool:
+    """
+    Send the recoverease_escalation_alert template to a doctor.
+    Template variables:
+      {{1}}=patient_name  {{2}}=severity  {{3}}=pain
+      {{4}}=sleep         {{5}}=mood      {{6}}=reason
+    Falls back to hello_world if the custom template is not yet approved.
+    """
+    sent = await send_template(
+        phone,
+        "recoverease_escalation_alert",
+        components=_body_component(
+            patient_name,
+            severity.upper(),
+            str(int(pain)),
+            f"{float(sleep):.1f}",
+            str(int(mood)),
+            reason,
+        ),
+    )
+    if not sent:
+        logger.info("whatsapp_escalation_template_fallback", phone_prefix=phone[:6])
+        sent = await send_template(phone, "hello_world")
+    return sent
+
+
 async def send_doctor_alert(phone: str, message: str) -> bool:
     """
-    Send an alert to a doctor — tries free text first (works when doctor has active
-    session), falls back to hello_world template so the doctor at least gets pinged.
+    Send a free-text alert to a doctor (works only within a 24h session window).
+    Falls back to hello_world template if session is not active.
+    Use send_sos_template / send_escalation_template for guaranteed delivery.
     """
     sent = await send_text(phone, message)
     if not sent:
-        # Fallback: hello_world template — guaranteed delivery, no session needed
         logger.info("whatsapp_falling_back_to_template", phone_prefix=phone[:6])
         sent = await send_template(phone, "hello_world")
     return sent

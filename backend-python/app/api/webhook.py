@@ -19,7 +19,6 @@ Environment variables needed:
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -29,7 +28,7 @@ from sqlalchemy import select
 from app.api.deps import DbSession
 from app.core.config import settings
 from app.core.logger import logger
-from app.models.models import DoctorPatient, Escalation, Role, User
+from app.models.models import Escalation, Role, User
 from app.schemas.symptom import LogSymptomRequest
 from app.services import groq_service, symptom_service, whatsapp_service
 
@@ -178,47 +177,4 @@ async def _handle_text_message(raw_phone: str, text: str, db: DbSession) -> None
     )
     await whatsapp_service.send_text(phone, confirmation)
 
-    # ── Notify doctors on WhatsApp if escalation fired ─────────────
-    if escalated and escalation:
-        await _notify_doctors_whatsapp(db, patient, parsed, escalation)
-
-
-async def _notify_doctors_whatsapp(
-    db: DbSession,
-    patient: User,
-    parsed: dict,
-    escalation: Escalation,
-) -> None:
-    """Send WhatsApp alerts to all linked doctors who have a phone number set."""
-    links_result = await db.execute(
-        select(DoctorPatient).where(
-            DoctorPatient.patient_id == patient.id,
-            DoctorPatient.is_active == True,  # noqa: E712
-        )
-    )
-    links = links_result.scalars().all()
-
-    severity = escalation.severity.value
-    # Build a plain-text reason from the AI verdict (if available)
-    ai_verdict = escalation.ai_verdict or {}
-    reason = ai_verdict.get("reasoning") or f"{severity} severity reading detected"
-
-    tasks = []
-    for link in links:
-        doc_result = await db.execute(select(User).where(User.id == link.doctor_id))
-        doctor = doc_result.scalar_one_or_none()
-        if doctor and doctor.whatsapp_phone:
-            alert = whatsapp_service.build_doctor_alert(
-                patient_name=patient.name,
-                parsed=parsed,
-                escalation_reason=reason,
-            )
-            tasks.append(whatsapp_service.send_doctor_alert(doctor.whatsapp_phone, alert))
-            logger.info(
-                "whatsapp_doctor_alert_queued",
-                doctor_id=str(doctor.id),
-                severity=severity,
-            )
-
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+    # Escalation WhatsApp alerts to doctors are disabled — email only.
