@@ -1,8 +1,9 @@
-# Recovery Companion — Frontend only
+# RecoverEase — Frontend only
 # Run independently from the backend stack.
-# Backend must be reachable at the ngrok URL below.
+# Create a .env file from .env.example and set your backend URL.
 #
 # Usage:
+#   cp .env.example .env   # then edit VITE_API_URL + VITE_SOCKET_URL
 #   docker compose up --build -d
 #   Open http://localhost:3000
 
@@ -12,8 +13,9 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-https://sun-unupset-pursuingly.ngrok-free.dev/api}
-        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://sun-unupset-pursuingly.ngrok-free.dev}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL}
+    env_file: .env
     image: rc_frontend:latest
     container_name: rc_frontend
     restart: unless-stopped

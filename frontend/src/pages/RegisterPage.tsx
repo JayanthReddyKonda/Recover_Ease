@@ -78,7 +78,7 @@ export default function RegisterPage() {
                     <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
                         <Heart className="h-4.5 w-4.5 fill-white text-white" />
                     </div>
-                    <span className="text-base font-bold text-white">Recovery Companion</span>
+                    <span className="text-base font-bold text-white">RecoverEase</span>
                 </div>
 
                 <div className="relative">
@@ -96,11 +96,11 @@ export default function RegisterPage() {
                         transition={{ duration: 0.6, delay: 0.12, ease }}
                         className="mt-3 text-sm text-white/55 leading-relaxed"
                     >
-                        Join thousands of patients and doctors who use Recovery Companion to stay connected and track progress.
+                        Join thousands of patients and doctors who use RecoverEase to stay connected and track progress.
                     </motion.p>
                 </div>
 
-                <p className="relative text-xs text-white/30">© {new Date().getFullYear()} Recovery Companion</p>
+                <p className="relative text-xs text-white/30">© {new Date().getFullYear()} RecoverEase</p>
             </div>
 
             {/* ── Right: form panel ── */}
@@ -124,7 +124,7 @@ export default function RegisterPage() {
                         </div>
                         <div className="text-center lg:text-left">
                             <h1 className="text-2xl font-extrabold text-white">Create your account</h1>
-                            <p className="mt-1 text-sm text-white/45">Join Recovery Companion and start your journey</p>
+                            <p className="mt-1 text-sm text-white/45">Join RecoverEase and start your journey</p>
                         </div>
                     </div>
 

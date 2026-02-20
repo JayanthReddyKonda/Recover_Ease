@@ -61,8 +61,7 @@ export default function Sidebar() {
                     <Heart className="h-[18px] w-[18px] fill-white text-white" />
                 </div>
                 <div className="leading-none">
-                    <span className="block text-[15px] font-bold text-white tracking-tight">Recovery</span>
-                    <span className="block text-[10px] text-white/30 mt-0.5">Companion</span>
+                    <span className="block text-[15px] font-bold text-white tracking-tight">RecoverEase</span>
                 </div>
                 <div className="ml-auto">
                     <div

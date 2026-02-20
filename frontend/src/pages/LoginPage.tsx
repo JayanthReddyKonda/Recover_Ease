@@ -63,7 +63,7 @@ export default function LoginPage() {
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
                             <Heart className="h-5 w-5 fill-white text-white" />
                         </div>
-                        <span className="text-lg font-bold text-white">Recovery Companion</span>
+                        <span className="text-lg font-bold text-white">RecoverEase</span>
                     </div>
                 </div>
 
@@ -102,7 +102,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="relative">
-                    <p className="text-xs text-white/30">© {new Date().getFullYear()} Recovery Companion</p>
+                    <p className="text-xs text-white/30">© {new Date().getFullYear()} RecoverEase</p>
                 </div>
             </div>
 

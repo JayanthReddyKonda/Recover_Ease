@@ -222,7 +222,7 @@ export default function LandingPage() {
                         ))}
                     </div>
                     <blockquote className="text-xl font-medium leading-relaxed text-white/70 italic">
-                        &ldquo;Recovery Companion made my post-surgery journey so much less stressful.
+                        &ldquo;RecoverEase made my post-surgery journey so much less stressful.
                         The AI insights caught a warning sign my doctor confirmed — it genuinely
                         helped my recovery.&rdquo;
                     </blockquote>
@@ -241,7 +241,7 @@ export default function LandingPage() {
 
             {/* ─── Footer ──────────────────────────── */}
             <footer className="py-8 text-center text-xs text-white/20" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                © {new Date().getFullYear()} Recovery Companion. Built with care.
+                © {new Date().getFullYear()} RecoverEase. Built with care.
             </footer>
         </div>
     );

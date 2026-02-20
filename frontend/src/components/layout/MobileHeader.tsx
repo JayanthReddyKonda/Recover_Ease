@@ -15,7 +15,7 @@ export default function MobileHeader() {
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)" }}>
                     <Heart className="h-3.5 w-3.5 fill-white text-white" />
                 </div>
-                <span className="text-sm font-bold text-white">Recovery</span>
+                <span className="text-sm font-bold text-white">RecoverEase</span>
             </Link>
             <div className="flex items-center gap-3">
                 {user?.role === "PATIENT" && (
