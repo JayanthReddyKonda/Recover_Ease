@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { patientApi } from "@/api/patient.api";
 import { symptomApi } from "@/api/symptom.api";
 import { aiApi } from "@/api/ai.api";
 import { requestApi } from "@/api/request.api";
+import { carePlanApi } from "@/api/care_plan.api";
 import { useAuth } from "@/hooks/useAuth";
 import Card from "@/components/Card";
 import MetricCard from "@/components/MetricCard";
@@ -11,13 +12,16 @@ import Badge from "@/components/Badge";
 import SymptomTrendChart from "@/components/charts/SymptomTrendChart";
 import MedicationHeatmap from "@/components/charts/MedicationHeatmap";
 import { PageTransition, Stagger, StaggerItem } from "@/components/motion";
-import { Activity, Brain, Heart, Moon, Utensils, Zap, UserCheck } from "lucide-react";
+import { Activity, Brain, Calendar, CheckCircle, Clock, Heart, Moon, Target, Utensils, Zap, UserCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 import Button from "@/components/Button";
-import { differenceInDays, parseISO } from "date-fns";
+import { differenceInDays, format, parseISO } from "date-fns";
+import { useStore } from "@/store/useStore";
 
 export default function PatientDashboard() {
     const { user } = useAuth();
+    const addToast = useStore((s) => s.addToast);
+    const qc = useQueryClient();
 
     const profile = useQuery({
         queryKey: ["patient-profile"],
@@ -48,6 +52,24 @@ export default function PatientDashboard() {
     const logs = useQuery({
         queryKey: ["symptom-logs-heatmap"],
         queryFn: () => symptomApi.getLogs(28, 0).then((r) => r.data),
+    });
+
+    const myTasks = useQuery({
+        queryKey: ["my-tasks"],
+        queryFn: () => carePlanApi.getMyTasks().then((r) => r.data ?? []),
+    });
+
+    const completeMut = useMutation({
+        mutationFn: ({ taskId, note }: { taskId: string; note?: string }) =>
+            carePlanApi.completeTask(taskId, note),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); },
+        onError: (e: Error) => addToast("error", "Failed", e.message),
+    });
+
+    const undoMut = useMutation({
+        mutationFn: (taskId: string) => carePlanApi.undoTask(taskId),
+        onSuccess: () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); },
+        onError: (e: Error) => addToast("error", "Failed", e.message),
     });
 
     const surgeryDay = user?.surgery_date
@@ -189,6 +211,85 @@ export default function PatientDashboard() {
                         <p className="text-sm text-gray-400">Log symptoms to get AI insights.</p>
                     )}
                 </Card>
+
+                {/* Recovery Tasks */}
+                {(myTasks.isLoading || (myTasks.data && myTasks.data.length > 0)) && (
+                    <Card>
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100">
+                                <Target className="h-4 w-4 text-purple-600" />
+                            </div>
+                            <h2 className="section-heading">My Recovery Tasks</h2>
+                            {myTasks.data && (
+                                <span className="ml-auto text-xs text-gray-400">
+                                    {myTasks.data.filter((t) => t.status === "COMPLETED").length}/{myTasks.data.length} done
+                                </span>
+                            )}
+                        </div>
+                        {myTasks.isLoading ? (
+                            <Skeleton lines={3} />
+                        ) : (
+                            <div className="space-y-2">
+                                {myTasks.data!.map((t) => (
+                                    <div key={t.id}
+                                        className={`flex items-start justify-between rounded-xl border p-3 transition-all ${
+                                            t.status === "COMPLETED"
+                                                ? "border-emerald-100 bg-emerald-50/60"
+                                                : "border-gray-100 bg-white"
+                                        }`}
+                                    >
+                                        <div className="flex gap-3 min-w-0">
+                                            <button
+                                                type="button"
+                                                disabled={completeMut.isPending || undoMut.isPending}
+                                                onClick={() =>
+                                                    t.status === "COMPLETED"
+                                                        ? undoMut.mutate(t.id)
+                                                        : completeMut.mutate({ taskId: t.id })
+                                                }
+                                                className="mt-0.5 shrink-0 transition-transform hover:scale-110"
+                                            >
+                                                {t.status === "COMPLETED" ? (
+                                                    <CheckCircle className="h-5 w-5 text-emerald-500" />
+                                                ) : (
+                                                    <div className="h-5 w-5 rounded-full border-2 border-gray-300 hover:border-primary-400" />
+                                                )}
+                                            </button>
+                                            <div className="min-w-0">
+                                                <p className={`text-sm font-medium ${
+                                                    t.status === "COMPLETED" ? "line-through text-gray-400" : "text-gray-900"
+                                                }`}>
+                                                    {t.title}
+                                                </p>
+                                                {t.description && (
+                                                    <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                                                )}
+                                                <div className="mt-1 flex flex-wrap gap-2">
+                                                    {t.frequency && (
+                                                        <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                                            <Clock className="h-2.5 w-2.5" />{t.frequency}
+                                                        </span>
+                                                    )}
+                                                    {t.due_date && (
+                                                        <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                                                            <Calendar className="h-2.5 w-2.5" />{format(parseISO(t.due_date), "MMM d")}
+                                                        </span>
+                                                    )}
+                                                    {t.doctor_name && (
+                                                        <span className="text-xs text-gray-400">from Dr. {t.doctor_name}</span>
+                                                    )}
+                                                </div>
+                                                {t.completion_note && (
+                                                    <p className="mt-1 text-xs text-emerald-600 italic">"{t.completion_note}"</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+                )}
 
                 {/* Milestones preview */}
                 {profile.data?.milestones && profile.data.milestones.length > 0 && (

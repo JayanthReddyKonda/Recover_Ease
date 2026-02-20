@@ -185,6 +185,63 @@ export interface RequestResponse {
 
 // ─── Patient ───────────────────────────────────────────
 
+// ─── Care Plan & Recovery Tasks ────────────────────────
+
+export type RecoveryTaskStatus = "PENDING" | "COMPLETED" | "SKIPPED";
+
+export interface RecoveryTask {
+    id: string;
+    doctor_id: string;
+    patient_id: string;
+    title: string;
+    description: string | null;
+    frequency: string | null;
+    due_date: string | null;
+    is_active: boolean;
+    status: RecoveryTaskStatus;
+    completed_at: string | null;
+    completion_note: string | null;
+    created_at: string;
+    updated_at: string;
+    doctor_name: string | null;
+}
+
+export interface CarePlan {
+    patient_id: string;
+    doctor_id: string;
+    specialty: string | null;
+    is_active: boolean;
+    medications: MedicationInput[] | null;
+    expected_recovery_date: string | null;
+    recovery_duration: string | null;
+    care_notes: string | null;
+    created_at: string;
+}
+
+export interface UpdateCarePlanBody {
+    medications?: MedicationInput[];
+    expected_recovery_date?: string;
+    recovery_duration?: string;
+    care_notes?: string;
+}
+
+export interface CreateTaskBody {
+    title: string;
+    description?: string;
+    frequency?: string;
+    due_date?: string;
+}
+
+export interface UpdateTaskBody {
+    title?: string;
+    description?: string;
+    frequency?: string;
+    due_date?: string;
+    is_active?: boolean;
+}
+
+// ─── Patient ───────────────────────────────────────────
+
 export interface EscalationResponse {
     id: string;
     patient_id: string;

@@ -44,6 +44,12 @@ class ChatSessionStatus(str, enum.Enum):
     CLOSED = "CLOSED"
 
 
+class RecoveryTaskStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    COMPLETED = "COMPLETED"
+    SKIPPED = "SKIPPED"
+
+
 class RequestStatus(str, enum.Enum):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
@@ -158,6 +164,14 @@ class DoctorPatient(Base):
     # True = patient is still under active treatment by this doctor
     # False = patient has fully recovered / treatment completed
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Current prescription / medication plan (JSON list of MedicationInput dicts)
+    medications: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Expected date the patient will fully recover
+    expected_recovery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Textual recovery duration the doctor sets, e.g. "6 weeks" or "3 months"
+    recovery_duration: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Additional doctor notes on this care relationship
+    care_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     doctor: Mapped[User] = relationship("User", foreign_keys=[doctor_id], back_populates="patient_links", lazy="selectin")
@@ -360,3 +374,50 @@ class ChatMessage(Base):
 
     session: Mapped[ChatSession] = relationship(back_populates="messages", lazy="selectin")
     sender: Mapped[User | None] = relationship("User", foreign_keys=[sender_id], lazy="selectin")
+
+
+# ── RecoveryTask ─────────────────────────────────────
+
+class RecoveryTask(Base):
+    """
+    A custom recovery task assigned by a doctor to their patient.
+    Examples: "Walk 10 minutes daily", "Eat only vegetables for lunch", "Ice knee 3x/day".
+    """
+    __tablename__ = "recovery_tasks"
+    __table_args__ = (
+        Index("ix_rt_patient", "patient_id"),
+        Index("ix_rt_doctor", "doctor_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    doctor_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Frequency text — e.g. "Daily", "Twice a day", "3x per week"
+    frequency: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Optional specific deadline for this task
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Task is active (visible to patient); doctor can deactivate without deleting
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    status: Mapped[RecoveryTaskStatus] = mapped_column(
+        Enum(RecoveryTaskStatus), default=RecoveryTaskStatus.PENDING, nullable=False
+    )
+    # When the patient marked it complete
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Patient's optional note when completing
+    completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    doctor: Mapped[User] = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
+    patient: Mapped[User] = relationship("User", foreign_keys=[patient_id], lazy="selectin")

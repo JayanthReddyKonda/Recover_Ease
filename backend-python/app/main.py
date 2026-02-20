@@ -30,6 +30,7 @@ from app.api.request import router as request_router
 from app.api.patient import router as patient_router
 from app.api.ai import router as ai_router
 from app.api.chat import router as chat_router
+from app.api.care_plan import router as care_plan_router
 
 START_TIME = time.time()
 
@@ -115,6 +116,7 @@ def create_app() -> socketio.ASGIApp:
     app.include_router(patient_router, prefix="/api")
     app.include_router(ai_router, prefix="/api")
     app.include_router(chat_router, prefix="/api")
+    app.include_router(care_plan_router, prefix="/api")
 
     # ── Mount Socket.IO ─────────────────────────────
     sio_asgi = socketio.ASGIApp(sio, other_asgi_app=app)
