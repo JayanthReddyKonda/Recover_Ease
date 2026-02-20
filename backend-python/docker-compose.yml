@@ -1,65 +1,70 @@
-# -- Recovery Companion -- Production Docker Stack --
+# ── RecoverEase — Local Docker Stack ────────────────────────────────────────
 # Usage:
-#   1. Create .env file with your real keys (see .env.example)
+#   1. cp .env.example .env  and fill in your real keys
 #   2. docker compose --env-file .env up --build -d
-# -------------------------------------------------------
+# ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  # -- PostgreSQL --
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: rc_postgres
+    container_name: recoverease_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - recoverease_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
-      - rc_network
+      - recoverease_network
 
-  # -- Redis --
+  # ── Redis ─────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: rc_redis
+    container_name: recoverease_redis
     restart: unless-stopped
     command: redis-server --appendonly yes
+    volumes:
+      - recoverease_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
-      - rc_network
+      - recoverease_network
 
-  # -- FastAPI Backend --
+  # ── FastAPI Backend ───────────────────────────────────────────────────────
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rc_backend
+    container_name: recoverease_backend
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
-      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-48}
       GROQ_API_KEY: ${GROQ_API_KEY}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
       WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
       WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
       WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-recovery_companion_whatsapp}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Recovery Companion}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-RecoverEase}
       PORT: 8000
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
     ports:
       - "8000:8000"
     depends_on:
@@ -74,22 +79,31 @@ services:
       retries: 5
       start_period: 15s
     networks:
-      - rc_network
+      - recoverease_network
 
-  # -- Ngrok (static domain tunnel) --
+  # ── Ngrok (public HTTPS tunnel for WhatsApp webhook) ──────────────────────
   ngrok:
     image: ngrok/ngrok:latest
-    container_name: rc_ngrok
+    container_name: recoverease_ngrok
     restart: unless-stopped
-    command: http backend:8000 --url=sun-unupset-pursuingly.ngrok-free.dev --log=stdout
+    command: http backend:8000 --url=${NGROK_DOMAIN:-sun-unupset-pursuingly.ngrok-free.dev} --log=stdout
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
     depends_on:
       backend:
         condition: service_healthy
     networks:
-      - rc_network
+      - recoverease_network
 
+# ── Named volumes (data persists across restarts & rebuilds) ──────────────────
+volumes:
+  recoverease_postgres_data:
+    name: recoverease_postgres_data
+  recoverease_redis_data:
+    name: recoverease_redis_data
+
+# ── Network ───────────────────────────────────────────────────────────────────
 networks:
-  rc_network:
+  recoverease_network:
     driver: bridge
+    name: recoverease_network
