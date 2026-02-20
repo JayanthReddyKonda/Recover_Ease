@@ -213,7 +213,7 @@ async def _notify_doctors_whatsapp(
                 parsed=parsed,
                 escalation_reason=reason,
             )
-            tasks.append(whatsapp_service.send_text(doctor.whatsapp_phone, alert))
+            tasks.append(whatsapp_service.send_doctor_alert(doctor.whatsapp_phone, alert))
             logger.info(
                 "whatsapp_doctor_alert_queued",
                 doctor_id=str(doctor.id),

@@ -224,7 +224,7 @@ async def trigger_sos(
                     f"Message: {notes or 'No details provided'}\n"
                     f"👉 Open your dashboard immediately."
                 )
-                await whatsapp_service.send_text(doctor.whatsapp_phone, sos_msg)
+                await whatsapp_service.send_doctor_alert(doctor.whatsapp_phone, sos_msg)
 
     if patient.caregiver_email:
         await email_service.send_caregiver_alert(

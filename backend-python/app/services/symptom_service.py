@@ -105,7 +105,7 @@ async def log_symptoms(
                             },
                             escalation_reason=f"{escalation.severity.value} severity reading detected",
                         )
-                        await whatsapp_service.send_text(doctor.whatsapp_phone, alert)
+                        await whatsapp_service.send_doctor_alert(doctor.whatsapp_phone, alert)
                     if sio:
                         await sio.emit(
                             "patient_alert",
