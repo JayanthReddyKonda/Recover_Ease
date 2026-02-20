@@ -30,7 +30,7 @@ from app.core.config import settings
 from app.core.logger import logger
 from app.models.models import Escalation, Role, User
 from app.schemas.symptom import LogSymptomRequest
-from app.services import groq_service, symptom_service, whatsapp_service
+from app.services import groq_service, patient_service, symptom_service, whatsapp_service
 
 router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
@@ -128,6 +128,22 @@ async def _handle_text_message(raw_phone: str, text: str, db: DbSession) -> None
             ),
         )
         logger.info("whatsapp_unknown_patient", phone_prefix=phone[:6])
+        return
+
+    # ── SOS keyword detection ────────────────────────────────
+    _SOS_KEYWORDS = {"sos", "help", "emergency", "urgent", "help me", "call doctor"}
+    if text.strip().lower() in _SOS_KEYWORDS:
+        notes = text if text.strip().lower() not in {"sos", "help", "emergency", "urgent"} else None
+        await patient_service.trigger_sos(db, patient, notes=notes, sio=None)
+        await whatsapp_service.send_text(
+            phone,
+            (
+                f"🚨 *SOS received, {patient.name.split()[0]}!*\n"
+                "Your doctor has been alerted immediately.\n"
+                "Stay calm — help is on the way. 💙"
+            ),
+        )
+        logger.info("whatsapp_sos_triggered", patient_id=str(patient.id))
         return
 
     # ── Parse free-text message with Groq ─────────────────────────
