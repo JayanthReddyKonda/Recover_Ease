@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     resend_from: str = "Recovery Companion <onboarding@resend.dev>"
 
     # ── Server ──────────────────────────────────────
-    port: int = 3001
+    port: int = 8000
     cors_origin: str = "http://localhost:5173"
     node_env: str = "development"  # kept for parity; used as env
 

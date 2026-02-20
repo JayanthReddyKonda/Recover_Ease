@@ -1,0 +1,109 @@
+# ── Recovery Companion — Full Docker Stack ──────────
+# Usage:
+#   1. Copy .env.docker to .env.docker.local and fill in your keys
+#   2. docker compose -f docker-compose.yml up --build -d
+#   3. Check ngrok URL: docker compose logs ngrok | grep "url="
+#   4. Your API is publicly accessible at that URL
+# ──────────────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: rc_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rc_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rc_password}
+      POSTGRES_DB: ${POSTGRES_DB:-recovery_companion}
+    volumes:
+      - rc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rc_user} -d ${POSTGRES_DB:-recovery_companion}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rc_network
+
+  # ── Redis ───────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: rc_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - rc_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - rc_network
+
+  # ── FastAPI Backend ─────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rc_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rc_user}:${POSTGRES_PASSWORD:-rc_password}@postgres:5432/${POSTGRES_DB:-recovery_companion}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change_me_to_a_32_char_random_string!!}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      GROQ_API_KEY: ${GROQ_API_KEY:-gsk_placeholder_replace_with_real_key}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.1-70b-versatile}
+      RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder_replace_with_real_key}
+      RESEND_FROM: ${RESEND_FROM:-Recovery Companion <onboarding@resend.dev>}
+      PORT: 8000
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - rc_network
+
+  # ── Ngrok Tunnel ────────────────────────────────────
+  # Exposes the backend to the internet via a public URL
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: rc_ngrok
+    restart: unless-stopped
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    command:
+      - "http"
+      - "http://backend:8000"
+      - "--log=stdout"
+    ports:
+      - "4040:4040"   # ngrok web inspection UI
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - rc_network
+
+volumes:
+  rc_pgdata:
+    driver: local
+  rc_redisdata:
+    driver: local
+
+networks:
+  rc_network:
+    driver: bridge

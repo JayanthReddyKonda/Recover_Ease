@@ -11,9 +11,10 @@ from app.core.config import settings
 from app.core.logger import logger
 
 # Create the Socket.IO server (async mode for FastAPI)
+_origins = settings.cors_origin.split(",") if settings.cors_origin else ["*"]
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins=settings.cors_origin.split(",") if settings.cors_origin else ["*"],
+    cors_allowed_origins="*" if "*" in _origins else _origins,
     logger=False,
     engineio_logger=False,
 )

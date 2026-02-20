@@ -70,10 +70,11 @@ def create_app() -> socketio.ASGIApp:
     )
 
     # ── Middleware ───────────────────────────────────
+    origins = settings.cors_origin.split(",")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origin.split(","),
-        allow_credentials=True,
+        allow_origins=["*"] if "*" in origins else origins,
+        allow_credentials="*" not in origins,  # credentials can't be used with wildcard
         allow_methods=["*"],
         allow_headers=["*"],
     )
