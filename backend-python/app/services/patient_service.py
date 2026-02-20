@@ -24,7 +24,7 @@ from app.models.models import (
 from app.schemas.common import SafeUser
 from app.schemas.patient import EscalationResponse, MilestoneResponse
 from app.schemas.symptom import SymptomLogResponse
-from app.services import email_service, escalation_service, groq_service, recovery_service
+from app.services import email_service, escalation_service, groq_service, recovery_service, whatsapp_service
 
 
 async def _verify_doctor_access(db: AsyncSession, doctor: User, patient_id: UUID) -> User:
@@ -215,6 +215,16 @@ async def trigger_sos(
                     },
                     room=f"doctor:{link.doctor_id}",
                 )
+            # WhatsApp alert to doctor
+            if doctor.whatsapp_phone:
+                sos_msg = (
+                    f"🚨 *SOS ALERT — RecoverEase*\n"
+                    f"Patient: *{patient.name}*\n"
+                    f"Severity: CRITICAL\n"
+                    f"Message: {notes or 'No details provided'}\n"
+                    f"👉 Open your dashboard immediately."
+                )
+                await whatsapp_service.send_text(doctor.whatsapp_phone, sos_msg)
 
     if patient.caregiver_email:
         await email_service.send_caregiver_alert(

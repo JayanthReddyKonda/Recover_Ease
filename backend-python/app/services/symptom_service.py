@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logger import logger
 from app.models.models import SymptomLog
 from app.schemas.symptom import LogSymptomRequest
-from app.services import email_service, escalation_service, groq_service, recovery_service
+from app.services import email_service, escalation_service, groq_service, recovery_service, whatsapp_service
 
 
 async def log_symptoms(
@@ -94,6 +94,18 @@ async def log_symptoms(
                         escalation.severity.value,
                         f"Escalation triggered — {escalation.severity.value} severity",
                     )
+                    # WhatsApp alert to doctor
+                    if doctor.whatsapp_phone:
+                        alert = whatsapp_service.build_doctor_alert(
+                            patient_name=patient.name,
+                            parsed={
+                                "pain_level": log.pain_level,
+                                "sleep_hours": log.sleep_hours or 0.0,
+                                "mood": log.mood,
+                            },
+                            escalation_reason=f"{escalation.severity.value} severity reading detected",
+                        )
+                        await whatsapp_service.send_text(doctor.whatsapp_phone, alert)
                     if sio:
                         await sio.emit(
                             "patient_alert",
