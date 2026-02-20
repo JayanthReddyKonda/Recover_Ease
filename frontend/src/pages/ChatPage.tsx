@@ -26,6 +26,8 @@ import {
     ChevronRight,
     Volume2,
     Stethoscope,
+    Paperclip,
+    ImageIcon,
 } from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────
@@ -112,6 +114,16 @@ function MessageBubble({ msg, isSelf }: { msg: ChatMessage; isSelf: boolean }) {
                             {msg.content && (
                                 <p className="mt-1.5 text-xs opacity-70 italic leading-relaxed">&#34;{msg.content}&#34;</p>
                             )}
+                        </div>
+                    ) : msg.image_url ? (
+                        <div className="min-w-[160px] max-w-[280px]">
+                            <img
+                                src={msg.image_url}
+                                alt="Shared image"
+                                className="w-full rounded-xl object-cover cursor-pointer"
+                                style={{ maxHeight: "260px" }}
+                                onClick={() => window.open(msg.image_url!, "_blank")}
+                            />
                         </div>
                     ) : (
                         msg.content
@@ -303,7 +315,10 @@ function ChatThread({
     const [interimText, setInterimText] = useState("");
     const [typingName, setTypingName] = useState<string | null>(null);
     const [isAiTyping, setIsAiTyping] = useState(false);
+    const [imgPreview, setImgPreview] = useState<string | null>(null);
+    const [imgFile, setImgFile] = useState<File | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
+    const imageInputRef = useRef<HTMLInputElement>(null);
     const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isAI = !session.doctor_id;
     const isActive = session.status === "ACTIVE";
@@ -343,6 +358,43 @@ function ChatThread({
     });
 
     const recorder = useVoiceRecorder((blob) => sendVoiceMsgMut.mutate(blob));
+
+    const sendImageMut = useMutation({
+        mutationFn: (file: File) => chatApi.sendImageMessage(session.id, file),
+        onSuccess: (res) => {
+            const msg = res.data.data;
+            if (msg) {
+                qc.setQueryData<ChatMessage[]>(["chat-messages", session.id], (old = []) => [
+                    ...old,
+                    msg,
+                ]);
+            }
+            setImgPreview(null);
+            setImgFile(null);
+            qc.invalidateQueries({ queryKey: ["chat-sessions"] });
+        },
+        onError: (e: Error) => addToast("error", "Image send failed", e.message),
+    });
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImgFile(file);
+        const reader = new FileReader();
+        reader.onload = () => setImgPreview(reader.result as string);
+        reader.readAsDataURL(file);
+        e.target.value = "";
+    };
+
+    const sendImage = () => {
+        if (!imgFile) return;
+        sendImageMut.mutate(imgFile);
+    };
+
+    const cancelImage = () => {
+        setImgPreview(null);
+        setImgFile(null);
+    };
 
     const sendAiMsg = useMutation({
         mutationFn: (content: string) => chatApi.sendAiMessage(session.id, content, voice.isListening),
@@ -558,73 +610,109 @@ function ChatThread({
                 <div ref={bottomRef} />
             </div>
 
-            {/* Voice transcript preview */}
-            <AnimatePresence>
-                {(voice.isListening || interimText) && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mx-4 mb-2 overflow-hidden"
-                    >
-                        <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
-                            <div className="flex gap-0.5 items-end h-5">
-                                {[3, 5, 4, 6, 3, 5, 4, 3, 6, 4].map((h, i) => (
-                                    <span
-                                        key={i}
-                                        className="w-0.5 rounded-full bg-primary-400 animate-bounce"
-                                        style={{ height: `${voice.isListening ? h * 2 : 4}px`, animationDelay: `${i * 0.05}s`, animationDuration: "0.6s" }}
-                                    />
-                                ))}
+            {/* Voice transcript preview — doctor-patient only */}
+            {!isAI && (
+                <AnimatePresence>
+                    {(voice.isListening || interimText) && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mx-4 mb-2 overflow-hidden"
+                        >
+                            <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
+                                <div className="flex gap-0.5 items-end h-5">
+                                    {[3, 5, 4, 6, 3, 5, 4, 3, 6, 4].map((h, i) => (
+                                        <span
+                                            key={i}
+                                            className="w-0.5 rounded-full bg-primary-400 animate-bounce"
+                                            style={{ height: `${voice.isListening ? h * 2 : 4}px`, animationDelay: `${i * 0.05}s`, animationDuration: "0.6s" }}
+                                        />
+                                    ))}
+                                </div>
+                                <span className="text-xs text-primary-600 italic flex-1 truncate">
+                                    {interimText || "Listening…"}
+                                </span>
+                                <button onClick={voice.stop} className="text-gray-400 hover:text-gray-600">
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
                             </div>
-                            <span className="text-xs text-primary-600 italic flex-1 truncate">
-                                {interimText || "Listening…"}
-                            </span>
-                            <button onClick={voice.stop} className="text-gray-400 hover:text-gray-600">
-                                <X className="h-3.5 w-3.5" />
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            )}
 
-            {/* Voice recording indicator */}
-            <AnimatePresence>
-                {recorder.isRecording && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mx-4 mb-2 overflow-hidden"
-                    >
-                        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                            <div className="flex h-2.5 w-2.5 shrink-0">
-                                <span className="h-full w-full rounded-full bg-red-500 animate-ping" />
+            {/* Voice recording indicator — doctor-patient only */}
+            {!isAI && (
+                <AnimatePresence>
+                    {recorder.isRecording && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mx-4 mb-2 overflow-hidden"
+                        >
+                            <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                                <div className="flex h-2.5 w-2.5 shrink-0">
+                                    <span className="h-full w-full rounded-full bg-red-500 animate-ping" />
+                                </div>
+                                <div className="flex gap-0.5 items-end h-5">
+                                    {[2, 4, 3, 5, 2, 4, 3, 2, 5, 3].map((h, i) => (
+                                        <span
+                                            key={i}
+                                            className="w-0.5 rounded-full bg-red-400 animate-bounce"
+                                            style={{ height: `${h * 2.5}px`, animationDelay: `${i * 0.06}s`, animationDuration: "0.5s" }}
+                                        />
+                                    ))}
+                                </div>
+                                <span className="text-xs text-red-600 font-mono font-semibold">
+                                    {Math.floor(recorder.duration / 60)}:{String(recorder.duration % 60).padStart(2, "0")}
+                                </span>
+                                <span className="flex-1 text-xs text-red-500">Recording…</span>
+                                <button
+                                    type="button"
+                                    onClick={recorder.stop}
+                                    className="text-xs font-medium text-red-600 hover:text-red-800 flex items-center gap-1"
+                                >
+                                    <Square className="h-3 w-3" /> Send
+                                </button>
                             </div>
-                            <div className="flex gap-0.5 items-end h-5">
-                                {[2, 4, 3, 5, 2, 4, 3, 2, 5, 3].map((h, i) => (
-                                    <span
-                                        key={i}
-                                        className="w-0.5 rounded-full bg-red-400 animate-bounce"
-                                        style={{ height: `${h * 2.5}px`, animationDelay: `${i * 0.06}s`, animationDuration: "0.5s" }}
-                                    />
-                                ))}
-                            </div>
-                            <span className="text-xs text-red-600 font-mono font-semibold">
-                                {Math.floor(recorder.duration / 60)}:{String(recorder.duration % 60).padStart(2, "0")}
-                            </span>
-                            <span className="flex-1 text-xs text-red-500">Recording…</span>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            )}
+
+            {/* Image preview — doctor-patient only */}
+            {!isAI && imgPreview && (
+                <div className="mx-4 mb-2 flex items-start gap-2 rounded-xl p-2" style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)" }}>
+                    <img src={imgPreview} alt="Preview" className="h-20 w-20 rounded-lg object-cover flex-shrink-0" />
+                    <div className="flex flex-col gap-1.5 justify-between h-20">
+                        <p className="text-xs text-gray-500 truncate max-w-[160px]">{imgFile?.name}</p>
+                        <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={recorder.stop}
-                                className="text-xs font-medium text-red-600 hover:text-red-800 flex items-center gap-1"
+                                onClick={sendImage}
+                                disabled={sendImageMut.isPending}
+                                className="flex items-center gap-1 rounded-lg bg-primary-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-600 disabled:opacity-50"
                             >
-                                <Square className="h-3 w-3" /> Send
+                                {sendImageMut.isPending ? (
+                                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                ) : (
+                                    <ImageIcon className="h-3 w-3" />
+                                )}
+                                Send
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelImage}
+                                className="flex items-center gap-1 rounded-lg bg-gray-100 px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-200"
+                            >
+                                <X className="h-3 w-3" /> Cancel
                             </button>
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    </div>
+                </div>
+            )}
 
             {/* Input bar */}
             <div className="border-t border-gray-100 p-3">
@@ -634,6 +722,17 @@ function ChatThread({
                     <p className="text-center text-sm text-amber-500 py-2">Accept the request to start chatting.</p>
                 ) : (
                     <div className="flex items-end gap-2">
+                        {/* Hidden image file input */}
+                        {!isAI && (
+                            <input
+                                ref={imageInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleImageSelect}
+                            />
+                        )}
+
                         <div className="flex-1 rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 focus-within:border-primary-400 focus-within:bg-white focus-within:ring-1 focus-within:ring-primary-200 transition-all">
                             <textarea
                                 value={text}
@@ -649,45 +748,59 @@ function ChatThread({
                             />
                         </div>
 
-                        {/* Speech-to-text button (fills text input) */}
-                        {voice.supported && (
-                            <button
-                                type="button"
-                                onClick={voice.toggle}
-                                className={cn(
-                                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all",
-                                    voice.isListening
-                                        ? "bg-indigo-500 text-white shadow-md shadow-indigo-200 scale-105"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        {/* Doctor-patient only: Speech-to-text + voice recorder + image */}
+                        {!isAI && (
+                            <>
+                                {voice.supported && (
+                                    <button
+                                        type="button"
+                                        onClick={voice.toggle}
+                                        className={cn(
+                                            "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all",
+                                            voice.isListening
+                                                ? "bg-indigo-500 text-white shadow-md shadow-indigo-200 scale-105"
+                                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                        )}
+                                        title={voice.isListening ? "Stop dictation" : "Dictate message"}
+                                    >
+                                        {voice.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                                    </button>
                                 )}
-                                title={voice.isListening ? "Stop dictation" : "Dictate message"}
-                            >
-                                {voice.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                            </button>
-                        )}
 
-                        {/* Voice message recorder button (real audio recording, doctor—patient only) */}
-                        {!isAI && recorder.supported && (
-                            <button
-                                type="button"
-                                onClick={() => recorder.isRecording ? recorder.stop() : recorder.start()}
-                                disabled={sendVoiceMsgMut.isPending}
-                                className={cn(
-                                    "relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all",
-                                    recorder.isRecording
-                                        ? "bg-red-500 text-white shadow-lg shadow-red-200 scale-105"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40"
+                                {recorder.supported && (
+                                    <button
+                                        type="button"
+                                        onClick={() => recorder.isRecording ? recorder.stop() : recorder.start()}
+                                        disabled={sendVoiceMsgMut.isPending}
+                                        className={cn(
+                                            "relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-all",
+                                            recorder.isRecording
+                                                ? "bg-red-500 text-white shadow-lg shadow-red-200 scale-105"
+                                                : "bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40"
+                                        )}
+                                        title={recorder.isRecording ? "Stop & send voice message" : "Record voice message"}
+                                    >
+                                        {sendVoiceMsgMut.isPending ? (
+                                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                        ) : recorder.isRecording ? (
+                                            <Square className="h-3.5 w-3.5" />
+                                        ) : (
+                                            <Stethoscope className="h-4 w-4" />
+                                        )}
+                                    </button>
                                 )}
-                                title={recorder.isRecording ? "Stop & send voice message" : "Record voice message"}
-                            >
-                                {sendVoiceMsgMut.isPending ? (
-                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                ) : recorder.isRecording ? (
-                                    <Square className="h-3.5 w-3.5" />
-                                ) : (
-                                    <Stethoscope className="h-4 w-4" />
-                                )}
-                            </button>
+
+                                {/* Image attachment button */}
+                                <button
+                                    type="button"
+                                    onClick={() => imageInputRef.current?.click()}
+                                    disabled={sendImageMut.isPending || !!imgPreview}
+                                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all disabled:opacity-40"
+                                    title="Attach image"
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                </button>
+                            </>
                         )}
 
                         {/* Send button */}

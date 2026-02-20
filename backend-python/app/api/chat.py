@@ -70,6 +70,7 @@ def _message_to_out(msg: ChatMessage) -> MessageOut:
         is_ai=msg.is_ai,
         is_voice=msg.is_voice,
         audio_url=msg.audio_url,
+        image_url=msg.image_url,
         created_at=msg.created_at,
         sender_name=msg.sender.name if msg.sender else ("AI Assistant" if msg.is_ai else None),
     )
@@ -267,6 +268,7 @@ async def send_message(session_id: UUID, body: SendMessageIn, user: CurrentUser,
                 "is_ai": out.is_ai,
                 "is_voice": out.is_voice,
                 "audio_url": out.audio_url,
+                "image_url": out.image_url,
                 "created_at": out.created_at.isoformat(),
             },
         },
@@ -334,6 +336,68 @@ async def send_voice_message(session_id: UUID, file: UploadFile, user: CurrentUs
                 "is_ai": out.is_ai,
                 "is_voice": out.is_voice,
                 "audio_url": out.audio_url,
+                "image_url": out.image_url,
+                "created_at": out.created_at.isoformat(),
+            },
+        },
+        room=f"chat:{session_id}",
+        skip_sid=None,
+    )
+
+    return ApiResponse(data=out)
+
+
+# ─────────────────────────────────────────────
+# POST /chat/sessions/{id}/image-message — send an image from gallery/file
+# ─────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/image-message")
+async def send_image_message(session_id: UUID, file: UploadFile, user: CurrentUser, db: DbSession):
+    """Accept an image upload, store as base64 data-URL, save + broadcast."""
+    session = await _get_session_or_403(db, session_id, user.id)
+    if session.doctor_id is None:
+        raise AppError("Image sharing is only available in doctor–patient sessions", 400)
+    if session.status != ChatSessionStatus.ACTIVE:
+        raise AppError("Session is not active", 400)
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise AppError("Empty image file", 400)
+
+    mime = file.content_type or "image/jpeg"
+    if not mime.startswith("image/"):
+        raise AppError("Only image files are allowed", 400)
+
+    image_b64 = base64.b64encode(image_bytes).decode()
+    image_data_url = f"data:{mime};base64,{image_b64}"
+
+    msg = ChatMessage(
+        session_id=session_id,
+        sender_id=user.id,
+        content="🖼️ Image",
+        is_ai=False,
+        is_voice=False,
+        image_url=image_data_url,
+    )
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+
+    out = _message_to_out(msg)
+
+    await sio.emit(
+        "new_message",
+        {
+            "session_id": str(session_id),
+            "message": {
+                "id": str(out.id),
+                "sender_id": str(out.sender_id) if out.sender_id else None,
+                "sender_name": out.sender_name,
+                "content": out.content,
+                "is_ai": out.is_ai,
+                "is_voice": out.is_voice,
+                "audio_url": out.audio_url,
+                "image_url": out.image_url,
                 "created_at": out.created_at.isoformat(),
             },
         },

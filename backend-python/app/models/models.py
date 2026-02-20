@@ -371,6 +371,8 @@ class ChatMessage(Base):
     is_voice: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # base64 data-URL of the recorded audio (e.g. "data:audio/webm;base64,...")
     audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # base64 data-URL of an attached image (e.g. "data:image/jpeg;base64,...")
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 

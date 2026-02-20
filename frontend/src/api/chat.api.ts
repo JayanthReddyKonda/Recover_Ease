@@ -49,4 +49,15 @@ export const chatApi = {
             { headers: { "Content-Type": "multipart/form-data" } },
         );
     },
+
+    /** Send an image from gallery/files (doctor–patient sessions only) */
+    sendImageMessage: (sessionId: string, imageFile: File) => {
+        const form = new FormData();
+        form.append("file", imageFile, imageFile.name);
+        return api.post<ApiResponse<ChatMessage>>(
+            `/chat/sessions/${sessionId}/image-message`,
+            form,
+            { headers: { "Content-Type": "multipart/form-data" } },
+        );
+    },
 };
