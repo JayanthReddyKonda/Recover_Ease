@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     smtp_password: str = ""      # Gmail App Password (16-char, needs 2FA)
     smtp_from_name: str = "Recovery Companion"
 
+    # -- WhatsApp Business (Meta Cloud API) --
+    # Get from: https://developers.facebook.com/apps → WhatsApp → API Setup
+    whatsapp_token: str = ""              # permanent or temp access token
+    whatsapp_phone_number_id: str = ""    # Phone Number ID (not the phone number itself)
+    whatsapp_verify_token: str = "recovery_companion_whatsapp"  # set this in Meta webhook config
+
     # -- Server --
     port: int = 8000
     cors_origin: str = "*"
@@ -56,6 +62,11 @@ class Settings(BaseSettings):
     def smtp_enabled(self) -> bool:
         """True when a Gmail address and App Password are configured."""
         return bool(self.smtp_user and self.smtp_password)
+
+    @property
+    def whatsapp_enabled(self) -> bool:
+        """True when Meta Cloud API credentials are configured."""
+        return bool(self.whatsapp_token and self.whatsapp_phone_number_id)
 
     # -- Validators --
     @field_validator("database_url")

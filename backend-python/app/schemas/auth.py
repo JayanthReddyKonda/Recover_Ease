@@ -36,3 +36,4 @@ class ProfileUpdateRequest(BaseModel):
     surgery_date: datetime | None = None
     surgery_type: str | None = None
     caregiver_email: EmailStr | None = None
+    whatsapp_phone: str | None = Field(None, pattern=r"^\+[1-9]\d{6,19}$|^$")

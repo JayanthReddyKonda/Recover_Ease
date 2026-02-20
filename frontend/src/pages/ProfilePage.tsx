@@ -14,7 +14,7 @@ import Badge from "@/components/Badge";
 import Modal from "@/components/Modal";
 import { PageTransition } from "@/components/motion";
 import { useState } from "react";
-import { Link2, Unlink, Hash } from "lucide-react";
+import { Link2, Unlink, Hash, Smartphone } from "lucide-react";
 import type { DoctorLink, ProfileUpdateRequest } from "@/types";
 
 const profileSchema = z.object({
@@ -22,6 +22,11 @@ const profileSchema = z.object({
     surgery_type: z.string().optional(),
     surgery_date: z.string().optional(),
     caregiver_email: z.string().email().optional().or(z.literal("")),
+    whatsapp_phone: z
+        .string()
+        .regex(/^\+[1-9]\d{6,19}$/, "Must be E.164 format, e.g. +919876543210")
+        .optional()
+        .or(z.literal("")),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -51,6 +56,7 @@ export default function ProfilePage() {
                 surgery_type: user.surgery_type ?? "",
                 surgery_date: user.surgery_date ?? "",
                 caregiver_email: user.caregiver_email ?? "",
+                whatsapp_phone: user.whatsapp_phone ?? "",
             }
             : undefined,
     });
@@ -130,6 +136,7 @@ export default function ProfilePage() {
                                 surgery_type: d.surgery_type || null,
                                 surgery_date: d.surgery_date || null,
                                 caregiver_email: d.caregiver_email || null,
+                                whatsapp_phone: d.whatsapp_phone || null,
                             }),
                         )}
                         className="space-y-4"
@@ -145,6 +152,22 @@ export default function ProfilePage() {
                                     {...register("caregiver_email")}
                                     error={errors.caregiver_email?.message}
                                 />
+                                <div className="rounded-xl border border-green-100 bg-green-50 p-3.5">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Smartphone className="h-3.5 w-3.5 text-green-600" />
+                                        <span className="text-xs font-semibold text-green-700">WhatsApp Bot Logging</span>
+                                    </div>
+                                    <p className="text-[11px] text-green-600 mb-2.5">
+                                        Link your WhatsApp number to log symptoms by simply texting the bot — no app needed.
+                                        Format: <code className="bg-green-100 px-1 py-0.5 rounded">+[country][number]</code> e.g. +919876543210
+                                    </p>
+                                    <Input
+                                        label="WhatsApp Number (E.164)"
+                                        placeholder="+919876543210"
+                                        {...register("whatsapp_phone")}
+                                        error={errors.whatsapp_phone?.message}
+                                    />
+                                </div>
                             </>
                         )}
                         <Button type="submit" loading={updateMut.isPending} disabled={!isDirty}>

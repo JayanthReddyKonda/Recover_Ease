@@ -100,6 +100,9 @@ class User(Base):
         String(10), unique=True, nullable=False, default=_connect_code, index=True
     )
 
+    # WhatsApp phone number for bot-based logging (e.g. "+919876543210")
+    whatsapp_phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+
     # Patient-specific (nullable for doctors)
     surgery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     surgery_type: Mapped[str | None] = mapped_column(String(255), nullable=True)

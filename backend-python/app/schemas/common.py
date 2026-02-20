@@ -35,6 +35,7 @@ class SafeUser(BaseModel):
     surgery_date: datetime | None = None
     surgery_type: str | None = None
     caregiver_email: str | None = None
+    whatsapp_phone: str | None = None
     created_at: datetime
     updated_at: datetime
 

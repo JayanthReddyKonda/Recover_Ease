@@ -30,6 +30,7 @@ export interface SafeUser {
     surgery_date: string | null;
     surgery_type: string | null;
     caregiver_email: string | null;
+    whatsapp_phone: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -79,6 +80,7 @@ export interface ProfileUpdateRequest {
     surgery_date?: string | null;
     surgery_type?: string | null;
     caregiver_email?: string | null;
+    whatsapp_phone?: string | null;
 }
 
 // ─── Symptoms ──────────────────────────────────────────

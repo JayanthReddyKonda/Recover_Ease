@@ -263,6 +263,61 @@ async def ai_chat_reply(
     return None
 
 
+# ─── WhatsApp message parser ───────────────────────────────────────────────
+
+async def parse_whatsapp_message(text: str) -> dict:
+    """
+    Parse a free-text WhatsApp message (e.g. "knee hurts, pain 7, slept 5 hours")
+    into structured SymptomLog fields.  Missing fields get sensible defaults.
+    Returns a dict with all fields required by LogSymptomRequest.
+    """
+    system = (
+        "You are a medical intake assistant for a post-surgery recovery app. "
+        "Parse the patient's informal WhatsApp message into structured recovery data. "
+        "Extract numeric values where explicitly stated. "
+        "Use these defaults for fields NOT mentioned: "
+        "pain_level=5, fatigue_level=5, mood=5, sleep_hours=7, appetite=5, energy=5. "
+        "pain_level, fatigue_level, mood, appetite, energy are integers 1-10. "
+        "sleep_hours is a float 0-24. "
+        "Return ONLY valid JSON: "
+        '{"pain_level": int, "fatigue_level": int, "mood": int, '
+        '"sleep_hours": float, "appetite": int, "energy": int, '
+        '"notes": str, "parsed_fields": [str]}'
+        " where parsed_fields lists ONLY the field names the patient explicitly mentioned."
+    )
+    result = await _chat(system, f"Patient WhatsApp message: {text}", max_tokens=250)
+
+    defaults = {
+        "pain_level": 5, "fatigue_level": 5, "mood": 5,
+        "sleep_hours": 7.0, "appetite": 5, "energy": 5,
+        "notes": text, "parsed_fields": [],
+    }
+
+    if result is None:
+        return defaults
+
+    # Merge + clamp values against valid ranges
+    for field, lo, hi in [
+        ("pain_level", 1, 10), ("fatigue_level", 1, 10), ("mood", 1, 10),
+        ("appetite", 1, 10), ("energy", 1, 10),
+    ]:
+        try:
+            defaults[field] = max(lo, min(hi, int(result.get(field, defaults[field]))))
+        except (TypeError, ValueError):
+            pass
+
+    try:
+        sleep = float(result.get("sleep_hours", 7.0))
+        defaults["sleep_hours"] = max(0.0, min(24.0, sleep))
+    except (TypeError, ValueError):
+        pass
+
+    defaults["notes"] = str(result.get("notes") or text).strip() or text
+    defaults["parsed_fields"] = result.get("parsed_fields", [])
+
+    return defaults
+
+
 # ─── Audio transcription ────────────────────────────────────────────────────
 
 async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> str:
