@@ -47,6 +47,7 @@ class DoctorLink(BaseModel):
     doctor_id: UUID
     patient_id: UUID
     specialty: str | None = None
+    is_active: bool = True
     created_at: datetime
     doctor: SafeUser | None = None
     patient: SafeUser | None = None

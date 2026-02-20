@@ -7,6 +7,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from app.api.deps import DbSession
 from app.middleware.auth import DoctorUser, PatientUser
@@ -51,3 +52,20 @@ async def review_escalation(
         db, doctor, escalation_id, body.status, body.notes
     )
     return ApiResponse(data=EscalationResponse.model_validate(esc))
+
+
+class TreatmentStatusBody(BaseModel):
+    is_active: bool
+
+
+@router.patch("/{patient_id}/treatment-status", response_model=ApiResponse[None])
+async def set_treatment_status(
+    patient_id: UUID,
+    body: TreatmentStatusBody,
+    doctor: DoctorUser,
+    db: DbSession,
+):
+    """Doctor marks a patient as recovered (is_active=False) or back in treatment (True)."""
+    await patient_service.set_treatment_status(db, doctor, patient_id, body.is_active)
+    status_label = "active treatment" if body.is_active else "recovered"
+    return ApiResponse(message=f"Patient marked as {status_label}")

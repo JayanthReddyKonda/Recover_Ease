@@ -23,8 +23,8 @@ email-validator==2.2.0
 # AI
 groq==0.13.1
 
-# Email
-resend==2.22.0
+# Email (Gmail SMTP — works for any recipient domain, no API restrictions)
+aiosmtplib==3.0.1
 
 # Real-time
 python-socketio==5.12.1

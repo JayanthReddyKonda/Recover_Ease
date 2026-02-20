@@ -36,9 +36,12 @@ class Settings(BaseSettings):
     groq_api_key: str
     groq_model: str = "llama-3.1-70b-versatile"
 
-    # -- Resend (email) --
-    resend_api_key: str = "re_placeholder_replace_with_real_key"
-    resend_from: str = "Recovery Companion <onboarding@resend.dev>"
+    # -- SMTP Email (Gmail recommended) --
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""          # your Gmail address
+    smtp_password: str = ""      # Gmail App Password (16-char, needs 2FA)
+    smtp_from_name: str = "Recovery Companion"
 
     # -- Server --
     port: int = 8000
@@ -50,12 +53,9 @@ class Settings(BaseSettings):
         return self.node_env == "production"
 
     @property
-    def resend_enabled(self) -> bool:
-        """True only when a real Resend key is configured."""
-        return (
-            self.resend_api_key != "re_placeholder_replace_with_real_key"
-            and self.resend_api_key.startswith("re_")
-        )
+    def smtp_enabled(self) -> bool:
+        """True when a Gmail address and App Password are configured."""
+        return bool(self.smtp_user and self.smtp_password)
 
     # -- Validators --
     @field_validator("database_url")

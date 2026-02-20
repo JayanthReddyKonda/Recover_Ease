@@ -149,6 +149,9 @@ class DoctorPatient(Base):
     )
     # Optional label — e.g. "Orthopedic Surgery", "Physiotherapy"
     specialty: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # True = patient is still under active treatment by this doctor
+    # False = patient has fully recovered / treatment completed
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     doctor: Mapped[User] = relationship("User", foreign_keys=[doctor_id], back_populates="patient_links", lazy="selectin")

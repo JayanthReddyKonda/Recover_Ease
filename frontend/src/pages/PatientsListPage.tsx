@@ -1,15 +1,33 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { requestApi } from "@/api/request.api";
+import { patientApi } from "@/api/patient.api";
+import { useStore } from "@/store/useStore";
 import Card from "@/components/Card";
 import Skeleton from "@/components/Skeleton";
 import Button from "@/components/Button";
+import Badge from "@/components/Badge";
 import { PageTransition, Stagger, StaggerItem } from "@/components/motion";
 import { Link } from "react-router-dom";
+import type { PatientWithStatus } from "@/types";
 
 export default function PatientsListPage() {
+    const addToast = useStore((s) => s.addToast);
+    const qc = useQueryClient();
+
     const patients = useQuery({
         queryKey: ["my-patients"],
-        queryFn: () => requestApi.getMyPatients().then((r) => r.data),
+        queryFn: () => requestApi.getMyPatients().then((r) => r.data as PatientWithStatus[]),
+    });
+
+    const toggleMut = useMutation({
+        mutationFn: ({ patientId, isActive }: { patientId: string; isActive: boolean }) =>
+            patientApi.setTreatmentStatus(patientId, isActive),
+        onSuccess: (_res, vars) => {
+            const label = vars.isActive ? "active treatment" : "recovered";
+            addToast("success", "Status updated", `Patient marked as ${label}`);
+            qc.invalidateQueries({ queryKey: ["my-patients"] });
+        },
+        onError: (err: Error) => addToast("error", "Failed", err.message),
     });
 
     return (
@@ -33,19 +51,37 @@ export default function PatientsListPage() {
                         {patients.data.map((p) => (
                             <StaggerItem key={p.id}>
                                 <Card hoverable>
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 mb-3">
-                                        <span className="text-sm font-bold">{p.name?.charAt(0)?.toUpperCase()}</span>
+                                    <div className="flex items-start justify-between mb-3">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
+                                            <span className="text-sm font-bold">{p.name?.charAt(0)?.toUpperCase()}</span>
+                                        </div>
+                                        <Badge variant={p.is_active ? "recovering" : "normal"}>
+                                            {p.is_active ? "In Treatment" : "Recovered"}
+                                        </Badge>
                                     </div>
                                     <p className="font-semibold text-gray-900">{p.name}</p>
                                     <p className="text-xs text-gray-400 truncate">{p.email}</p>
                                     {p.surgery_type && (
                                         <p className="mt-1.5 text-xs text-gray-500">{p.surgery_type}</p>
                                     )}
-                                    <Link to={`/patients/${p.id}`} className="mt-4 block">
-                                        <Button size="sm" variant="outline" className="w-full">
-                                            View Details
+                                    <div className="mt-4 flex gap-2">
+                                        <Link to={`/patients/${p.id}`} className="flex-1">
+                                            <Button size="sm" variant="outline" className="w-full">
+                                                View Details
+                                            </Button>
+                                        </Link>
+                                        <Button
+                                            size="sm"
+                                            variant={p.is_active ? "ghost" : "primary"}
+                                            loading={toggleMut.isPending}
+                                            onClick={() =>
+                                                toggleMut.mutate({ patientId: p.id, isActive: !p.is_active })
+                                            }
+                                            title={p.is_active ? "Mark as Recovered" : "Mark back In Treatment"}
+                                        >
+                                            {p.is_active ? "Recovered ✓" : "In Treatment"}
                                         </Button>
-                                    </Link>
+                                    </div>
                                 </Card>
                             </StaggerItem>
                         ))}
@@ -62,3 +98,4 @@ export default function PatientsListPage() {
         </PageTransition>
     );
 }
+

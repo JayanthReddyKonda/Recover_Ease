@@ -30,4 +30,12 @@ export const patientApi = {
                 data,
             )
             .then((r) => r.data),
+
+    /** Doctor marks a patient as recovered (false) or back in treatment (true) */
+    setTreatmentStatus: (patientId: string, isActive: boolean) =>
+        api
+            .patch<ApiResponse<null>>(`/patients/${patientId}/treatment-status`, {
+                is_active: isActive,
+            })
+            .then((r) => r.data),
 };

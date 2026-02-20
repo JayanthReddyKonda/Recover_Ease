@@ -76,7 +76,10 @@ async def log_symptoms(
         patient = patient_result.scalar_one_or_none()
         if patient:
             links_result = await db.execute(
-                select(DoctorPatient).where(DoctorPatient.patient_id == patient_id)
+                select(DoctorPatient).where(
+                    DoctorPatient.patient_id == patient_id,
+                    DoctorPatient.is_active == True,  # noqa: E712
+                )
             )
             links = links_result.scalars().all()
 

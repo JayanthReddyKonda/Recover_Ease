@@ -40,9 +40,16 @@ export interface DoctorLink {
     doctor_id: string;
     patient_id: string;
     specialty: string | null;
+    is_active: boolean;
     created_at: string;
     doctor: SafeUser | null;
     patient: SafeUser | null;
+}
+
+// Patient as seen by a doctor (includes treatment status)
+export interface PatientWithStatus extends SafeUser {
+    is_active: boolean;
+    link_id: string;
 }
 
 // ─── Auth ──────────────────────────────────────────────

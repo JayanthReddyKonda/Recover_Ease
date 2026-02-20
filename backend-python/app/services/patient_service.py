@@ -158,9 +158,12 @@ async def trigger_sos(
 
     escalation = await escalation_service.run_escalation_check(db, log, is_sos=True)
 
-    # Gather all linked doctors
+    # Gather only ACTIVE-treatment doctors (not already-recovered patients)
     links_result = await db.execute(
-        select(DoctorPatient).where(DoctorPatient.patient_id == patient.id)
+        select(DoctorPatient).where(
+            DoctorPatient.patient_id == patient.id,
+            DoctorPatient.is_active == True,  # noqa: E712
+        )
     )
     links = links_result.scalars().all()
 
@@ -204,6 +207,27 @@ async def trigger_sos(
         )
 
     return escalation
+
+
+async def set_treatment_status(
+    db: AsyncSession,
+    doctor: User,
+    patient_id: UUID,
+    is_active: bool,
+) -> None:
+    """Doctor toggles a patient's treatment status (active ↔ recovered)."""
+    link_result = await db.execute(
+        select(DoctorPatient).where(
+            DoctorPatient.doctor_id == doctor.id,
+            DoctorPatient.patient_id == patient_id,
+        )
+    )
+    link = link_result.scalar_one_or_none()
+    if not link:
+        from app.middleware.error_handler import AppError
+        raise AppError("Not your patient", 403)
+    link.is_active = is_active
+    await db.flush()
 
 
 async def review_escalation(

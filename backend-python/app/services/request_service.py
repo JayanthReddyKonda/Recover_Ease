@@ -169,6 +169,7 @@ async def get_my_doctors(db: AsyncSession, patient: User) -> list[DoctorLink]:
             doctor_id=link.doctor_id,
             patient_id=link.patient_id,
             specialty=link.specialty,
+            is_active=link.is_active,
             created_at=link.created_at,
             doctor=SafeUser.model_validate(link.doctor) if link.doctor else None,
         )
@@ -176,13 +177,20 @@ async def get_my_doctors(db: AsyncSession, patient: User) -> list[DoctorLink]:
     ]
 
 
-async def get_my_patients(db: AsyncSession, doctor: User) -> list[SafeUser]:
-    """Get all patients assigned to this doctor."""
+async def get_my_patients(db: AsyncSession, doctor: User) -> list[dict]:
+    """Get all patients assigned to this doctor, with their treatment status."""
     result = await db.execute(
         select(DoctorPatient).where(DoctorPatient.doctor_id == doctor.id)
     )
     links = result.scalars().all()
-    return [SafeUser.model_validate(link.patient) for link in links if link.patient]
+    out = []
+    for link in links:
+        if link.patient:
+            patient_data = SafeUser.model_validate(link.patient).model_dump()
+            patient_data["is_active"] = link.is_active
+            patient_data["link_id"] = str(link.id)
+            out.append(patient_data)
+    return out
 
 
 async def disconnect(db: AsyncSession, user: User, other_id: UUID) -> bool:
