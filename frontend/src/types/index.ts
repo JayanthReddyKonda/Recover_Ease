@@ -131,10 +131,41 @@ export interface SymptomSummary {
 
 // ─── Requests ──────────────────────────────────────────
 
+export interface MedicationInput {
+    name: string;
+    dosage: string;
+    frequency: string;
+    time_of_day: string;
+    instructions: string;
+}
+
+export interface MedicationScheduleItem {
+    name: string;
+    dosage: string;
+    frequency: string;
+    time_of_day: string;
+    instructions: string;
+}
+
+export interface AiStructuredPlan {
+    condition_summary: string;
+    diagnosis_keywords: string[];
+    medication_schedule: MedicationScheduleItem[];
+    care_instructions: string[];
+    dietary_notes: string;
+    activity_restrictions: string;
+    follow_up_timeline: string;
+    risk_flags: string[];
+    urgency: string;
+}
+
 export interface SendRequestBody {
     to_email?: string;
     connect_code?: string;
     specialty?: string;
+    visit_date?: string;
+    disease_description: string;
+    medications: MedicationInput[];
 }
 
 export interface RequestResponse {
@@ -145,6 +176,11 @@ export interface RequestResponse {
     created_at: string;
     from_user: SafeUser | null;
     to_user: SafeUser | null;
+    specialty: string | null;
+    visit_date: string | null;
+    disease_description: string | null;
+    medications: MedicationInput[] | null;
+    ai_structured_plan: AiStructuredPlan | null;
 }
 
 // ─── Patient ───────────────────────────────────────────
@@ -253,6 +289,59 @@ export interface PatientAlertEvent {
 
 export interface MilestoneEarnedEvent {
     milestones: { key: string; title: string; icon: string }[];
+}
+
+// ─── Chat ───────────────────────────────────────────────
+
+export type ChatSessionStatus = "REQUESTED" | "ACTIVE" | "CLOSED";
+
+export interface ChatMessage {
+    id: string;
+    session_id: string;
+    sender_id: string | null;
+    sender_name: string | null;
+    content: string;
+    is_ai: boolean;
+    is_voice: boolean;
+    created_at: string;
+}
+
+export interface ChatSession {
+    id: string;
+    patient_id: string;
+    doctor_id: string | null;
+    status: ChatSessionStatus;
+    title: string;
+    is_request: boolean;
+    created_at: string;
+    updated_at: string;
+    last_message: string | null;
+    unread: number;
+}
+
+// Socket event: new real-time message arrived
+export interface NewMessageEvent {
+    session_id: string;
+    message: ChatMessage;
+}
+
+// Socket event: someone is typing
+export interface TypingEvent {
+    session_id: string;
+    user_name: string;
+}
+
+// Socket event: doctor accepted a chat request
+export interface ChatRequestAcceptedEvent {
+    session_id: string;
+    doctor_name: string;
+}
+
+// Socket event: patient sent a chat request
+export interface ChatRequestEvent {
+    session_id: string;
+    patient_name: string;
+    title: string;
 }
 
 // ─── Toast ─────────────────────────────────────────────

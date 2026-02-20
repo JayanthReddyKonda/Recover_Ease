@@ -153,8 +153,39 @@ async def generate_doctor_summary(patient_data: dict) -> dict[str, Any] | None:
     return await _chat(system, json.dumps(patient_data), cache_key=cache_key, ttl=CACHE_TTL["doctor_summary"], max_tokens=600)
 
 
-async def get_escalation_verdict(symptom_data: dict, rule_results: list[dict]) -> dict[str, Any] | None:
-    """Ask AI to validate rule-based escalation triggers and provide a verdict."""
+async def structure_clinical_request(
+    disease_description: str,
+    medications: list[dict] | None,
+    visit_date: str | None,
+    patient_name: str | None = None,
+    doctor_name: str | None = None,
+) -> dict[str, Any] | None:
+    """
+    AI structures a doctor's clinical request into a formatted care plan.
+    Called when a doctor sends a connection request to a patient.
+    """
+    system = (
+        "You are a clinical AI assistant. Structure a doctor's care request for a patient into a "
+        "clear, organised care plan. Be concise and patient-friendly. "
+        "Return ONLY valid JSON — no extra text or markdown."
+    )
+    user_prompt = (
+        f"Doctor: {doctor_name or 'Unknown'}\n"
+        f"Patient: {patient_name or 'Unknown'}\n"
+        f"Visit/Surgery Date: {visit_date or 'Not specified'}\n\n"
+        f"Condition Description:\n{disease_description}\n\n"
+        f"Medications:\n{json.dumps(medications or [], indent=2)}\n\n"
+        'Return JSON: {"condition_summary": str, "diagnosis_keywords": [str], '
+        '"medication_schedule": [{"name": str, "dosage": str, "frequency": str, '
+        '"time_of_day": str, "instructions": str}], '
+        '"care_instructions": [str], "dietary_notes": [str], '
+        '"activity_restrictions": [str], "follow_up_timeline": str, '
+        '"risk_flags": [str], "urgency": "ROUTINE|MODERATE|HIGH"}'
+    )
+    return await _chat(system, user_prompt, max_tokens=900)
+
+
+async def get_escalation_verdict(symptom_data: dict, rule_results: list[dict]) -> dict[str, Any] | None:    """Ask AI to validate rule-based escalation triggers and provide a verdict."""
     cache_key = f"escalation:{symptom_data.get('log_id')}"
     system = (
         "You are a clinical escalation reviewer. Given the patient's symptoms and rule-based triggers, "
@@ -175,3 +206,59 @@ async def get_escalation_verdict(symptom_data: dict, rule_results: list[dict]) -
         }
 
     return result
+
+
+# ─── Conversational AI chat ─────────────────────────────────────────────────
+
+RECOVERY_COMPANION_SYSTEM = """You are Recovery Companion AI — a warm, knowledgeable, and empathetic virtual health assistant specialising in post-surgical recovery. You help patients understand their symptoms, manage their recovery journey, and feel supported.
+
+Guidelines:
+• Be conversational, supportive, and encouraging — not clinical or cold.
+• You can discuss pain levels, medication reminders, sleep, mood, fatigue, physiotherapy exercises, and recovery milestones.
+• If the patient describes emergency symptoms (chest pain, severe bleeding, high fever >103°F, loss of consciousness), immediately instruct them to call emergency services and contact their doctor.
+• Never diagnose or prescribe — always encourage consulting their doctor for medical decisions.
+• Keep responses concise (2-4 sentences unless more detail is asked for).
+• You have access to their recent symptom logs if provided in the context message.
+• Always end with one encouraging or actionable sentence."""
+
+
+async def ai_chat_reply(
+    conversation_history: list[dict[str, str]],
+    patient_context: dict | None = None,
+) -> str | None:
+    """
+    Generate a conversational AI reply given the full message history.
+
+    conversation_history: list of {"role": "user"|"assistant", "content": str}
+    patient_context: optional dict with patient's recent symptom data to inject into the system prompt
+    """
+    system = RECOVERY_COMPANION_SYSTEM
+    if patient_context:
+        system += f"\n\nPatient context (recent data):\n{json.dumps(patient_context, indent=2)}"
+
+    messages_payload: list[dict[str, str]] = [{"role": "system", "content": system}]
+    messages_payload.extend(conversation_history[-20:])  # keep last 20 turns to stay within token limits
+
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = await client.chat.completions.create(
+                model=settings.groq_model,
+                messages=messages_payload,  # type: ignore[arg-type]
+                max_tokens=400,
+                temperature=0.75,
+                # No response_format=json here — we want natural language
+            )
+            return (response.choices[0].message.content or "").strip()
+
+        except RateLimitError:
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(2 ** attempt)
+            else:
+                return "I'm a little busy right now — please try again in a moment."
+
+        except (APITimeoutError, APIError, Exception) as e:
+            logger.error("groq_chat_error", error=str(e))
+            return "Sorry, I couldn't process that. Please try again."
+
+    return None
+

@@ -18,12 +18,16 @@ router = APIRouter(prefix="/requests", tags=["Requests"])
 
 
 @router.post("", response_model=ApiResponse[RequestResponse])
-async def send_request(body: SendRequestBody, user: CurrentUser, db: DbSession):
+async def send_request(body: SendRequestBody, doctor: DoctorUser, db: DbSession):
+    """Only doctors can send connection requests, with full clinical context."""
     req = await request_service.send_request(
-        db, user,
+        db, doctor,
         to_email=body.to_email,
         connect_code=body.connect_code,
         specialty=body.specialty,
+        visit_date=body.visit_date,
+        disease_description=body.disease_description,
+        medications=[m.model_dump() for m in body.medications],
     )
     return ApiResponse(data=RequestResponse.model_validate(req))
 

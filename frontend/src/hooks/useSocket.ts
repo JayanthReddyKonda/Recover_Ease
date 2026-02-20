@@ -1,16 +1,18 @@
 import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useStore } from "@/store/useStore";
-import type { MilestoneEarnedEvent, PatientAlertEvent } from "@/types";
+import { socketStore } from "@/lib/socketStore";
+import type {
+    ChatRequestAcceptedEvent,
+    ChatRequestEvent,
+    MilestoneEarnedEvent,
+    NewMessageEvent,
+    PatientAlertEvent,
+    TypingEvent,
+} from "@/types";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || undefined;
 
-/**
- * Manages a single Socket.IO connection scoped to the authenticated user.
- * - Patients join "patient:{id}" room.
- * - Doctors  join "doctor:{id}" room.
- * Listens for real-time events and surfaces them as toasts + browser notifications.
- */
 export function useSocket() {
     const { user, token, setConnected, addToast } = useStore();
     const socketRef = useRef<Socket | null>(null);
@@ -24,10 +26,10 @@ export function useSocket() {
         });
 
         socketRef.current = socket;
+        socketStore.set(socket);
 
         socket.on("connect", () => {
             setConnected(true);
-            // Ask server to join the correct room
             if (user.role === "DOCTOR") {
                 socket.emit("join_doctor_room", { doctor_id: user.id });
             } else {
@@ -37,7 +39,6 @@ export function useSocket() {
 
         socket.on("disconnect", () => setConnected(false));
 
-        // ─── Doctor: alert when patient submits concerning log / SOS ────
         socket.on("patient_alert", (data: PatientAlertEvent) => {
             const severity = data.is_sos ? "error" : "warning";
             const title = data.is_sos ? "SOS Alert!" : "Patient Escalation";
@@ -45,7 +46,6 @@ export function useSocket() {
             notifyBrowser(title, `${data.patient_name} – ${data.severity}`);
         });
 
-        // ─── Patient: milestone earned ─────────────────────────────────
         socket.on("milestone_earned", (data: MilestoneEarnedEvent) => {
             data.milestones.forEach((m) => {
                 addToast("success", `${m.icon} ${m.title}`, "You earned a milestone!");
@@ -53,9 +53,19 @@ export function useSocket() {
             });
         });
 
+        socket.on("chat_request", (data: ChatRequestEvent) => {
+            addToast("info", "Chat Request", `${data.patient_name} wants to chat`);
+            notifyBrowser("New Chat Request", `${data.patient_name} – ${data.title}`);
+        });
+
+        socket.on("chat_request_accepted", (data: ChatRequestAcceptedEvent) => {
+            addToast("success", "Chat Accepted", `Dr. ${data.doctor_name} accepted your chat request`);
+        });
+
         return () => {
             socket.disconnect();
             socketRef.current = null;
+            socketStore.set(null);
             setConnected(false);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -64,7 +74,38 @@ export function useSocket() {
     return socketRef;
 }
 
-// ─── Browser Notification (feature-detected) ────────────
+/**
+ * Subscribe to real-time messages for a specific chat session.
+ * Uses the module-level socket singleton set by useSocket.
+ */
+export function useChatSocket(
+    sessionId: string | null,
+    onMessage: (event: NewMessageEvent) => void,
+    onTyping: (event: TypingEvent) => void,
+) {
+    useEffect(() => {
+        const socket = socketStore.get();
+        if (!socket || !sessionId) return;
+
+        socket.emit("join_chat_room", { session_id: sessionId });
+
+        const handleMessage = (data: NewMessageEvent) => {
+            if (data.session_id === sessionId) onMessage(data);
+        };
+        const handleTyping = (data: TypingEvent) => {
+            if (data.session_id === sessionId) onTyping(data);
+        };
+
+        socket.on("new_message", handleMessage);
+        socket.on("typing", handleTyping);
+
+        return () => {
+            socket.emit("leave_chat_room", { session_id: sessionId });
+            socket.off("new_message", handleMessage);
+            socket.off("typing", handleTyping);
+        };
+    }, [sessionId]);
+}
 
 function notifyBrowser(title: string, body: string) {
     if (!("Notification" in window)) return;
@@ -76,3 +117,4 @@ function notifyBrowser(title: string, body: string) {
         });
     }
 }
+

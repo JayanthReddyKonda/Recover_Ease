@@ -52,6 +52,38 @@ async def join_patient_room(sid: str, data: dict) -> None:
         logger.info("patient_joined_room", sid=sid, room=room)
 
 
+@sio.event
+async def join_chat_room(sid: str, data: dict) -> None:
+    """Join a specific chat session room to receive real-time messages."""
+    session_id = data.get("session_id")
+    if session_id:
+        room = f"chat:{session_id}"
+        await sio.enter_room(sid, room)
+        logger.info("joined_chat_room", sid=sid, room=room)
+
+
+@sio.event
+async def leave_chat_room(sid: str, data: dict) -> None:
+    """Leave a chat session room."""
+    session_id = data.get("session_id")
+    if session_id:
+        await sio.leave_room(sid, f"chat:{session_id}")
+
+
+@sio.event
+async def typing(sid: str, data: dict) -> None:
+    """Broadcast typing indicator to chat room."""
+    session_id = data.get("session_id")
+    user_name = data.get("user_name", "Someone")
+    if session_id:
+        await sio.emit(
+            "typing",
+            {"session_id": session_id, "user_name": user_name},
+            room=f"chat:{session_id}",
+            skip_sid=sid,
+        )
+
+
 def create_sio_app() -> socketio.ASGIApp:
     """Create the ASGI app wrapper for Socket.IO."""
     return socketio.ASGIApp(sio)

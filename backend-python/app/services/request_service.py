@@ -1,10 +1,11 @@
 """
 Doctor-patient request service — send, accept, reject, disconnect.
-Patients can have MULTIPLE doctors; connect via email OR connect_code.
+Only doctors can initiate requests; patients accept/reject.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import and_, select
@@ -15,14 +16,42 @@ from app.models.models import DoctorPatient, DoctorPatientRequest, RequestStatus
 from app.schemas.common import DoctorLink, SafeUser
 
 
+"""
+Doctor-patient request service — send, accept, reject, disconnect.
+Only doctors can initiate requests; patients accept/reject.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.middleware.error_handler import AppError
+from app.models.models import DoctorPatient, DoctorPatientRequest, RequestStatus, Role, User
+from app.schemas.common import DoctorLink, SafeUser
+from app.services import groq_service
+
+
 async def send_request(
     db: AsyncSession,
     from_user: User,
     to_email: str | None = None,
     connect_code: str | None = None,
     specialty: str | None = None,
+    visit_date: str | None = None,
+    disease_description: str = "",
+    medications: list[dict] | None = None,
 ) -> DoctorPatientRequest:
-    """Send a connection request (doctor ↔ patient) by email or connect_code."""
+    """
+    Doctors-only: send a clinical connection request to a patient.
+    AI structures the clinical information into a care plan.
+    """
+    if from_user.role != Role.DOCTOR:
+        raise AppError("Only doctors can send connection requests", 403)
+
     if not to_email and not connect_code:
         raise AppError("Provide either to_email or connect_code", 400)
 
@@ -33,14 +62,13 @@ async def send_request(
     to_user = result.scalar_one_or_none()
 
     if not to_user:
-        raise AppError("User not found", 404)
+        raise AppError("Patient not found", 404)
     if to_user.id == from_user.id:
         raise AppError("Cannot send request to yourself", 400)
+    if to_user.role != Role.PATIENT:
+        raise AppError("You can only send requests to patients", 400)
 
-    if from_user.role == to_user.role:
-        raise AppError("Both users have the same role — need doctor + patient", 400)
-
-    # Check for existing PENDING request in either direction
+    # Check for existing PENDING request
     existing = await db.execute(
         select(DoctorPatientRequest).where(
             and_(
@@ -53,33 +81,46 @@ async def send_request(
     if existing.scalar_one_or_none():
         raise AppError("Request already pending", 409)
 
-    reverse = await db.execute(
-        select(DoctorPatientRequest).where(
-            and_(
-                DoctorPatientRequest.from_id == to_user.id,
-                DoctorPatientRequest.to_id == from_user.id,
-                DoctorPatientRequest.status == RequestStatus.PENDING,
-            )
-        )
-    )
-    if reverse.scalar_one_or_none():
-        raise AppError("A pending request from this user already exists", 409)
-
     # Check already linked
-    doctor_id = from_user.id if from_user.role == Role.DOCTOR else to_user.id
-    patient_id = from_user.id if from_user.role == Role.PATIENT else to_user.id
     already = await db.execute(
         select(DoctorPatient).where(
-            and_(DoctorPatient.doctor_id == doctor_id, DoctorPatient.patient_id == patient_id)
+            and_(DoctorPatient.doctor_id == from_user.id, DoctorPatient.patient_id == to_user.id)
         )
     )
     if already.scalar_one_or_none():
-        raise AppError("Already connected", 409)
+        raise AppError("Already connected with this patient", 409)
+
+    # ── AI structures the clinical information ──────────────────────────
+    ai_plan: dict | None = None
+    if disease_description.strip():
+        visit_date_str = visit_date or None
+        ai_plan = await groq_service.structure_clinical_request(
+            disease_description=disease_description,
+            medications=medications,
+            visit_date=visit_date_str,
+            patient_name=to_user.name,
+            doctor_name=from_user.name,
+        )
+
+    # Parse visit_date to datetime if provided
+    parsed_visit_date: datetime | None = None
+    if visit_date:
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%d/%m/%Y", "%m/%d/%Y"):
+            try:
+                parsed_visit_date = datetime.strptime(visit_date.strip(), fmt)
+                break
+            except ValueError:
+                continue
 
     req = DoctorPatientRequest(
         from_id=from_user.id,
         to_id=to_user.id,
         status=RequestStatus.PENDING,
+        specialty=specialty,
+        visit_date=parsed_visit_date,
+        disease_description=disease_description or None,
+        medications=medications or None,
+        ai_structured_plan=ai_plan,
     )
     db.add(req)
     await db.flush()
@@ -118,8 +159,9 @@ async def accept_request(
 
     req.status = RequestStatus.ACCEPTED
 
-    doctor_id = req.from_id if user.role == Role.PATIENT else user.id
-    patient_id = user.id if user.role == Role.PATIENT else req.from_id
+    # doctor→patient is always from_id→to_id now
+    doctor_id = req.from_id
+    patient_id = req.to_id
 
     existing = await db.execute(
         select(DoctorPatient).where(

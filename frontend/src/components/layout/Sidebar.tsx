@@ -12,6 +12,7 @@ import {
     AlertTriangle,
     LogOut,
     Settings,
+    MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useStore } from "@/store/useStore";
@@ -22,12 +23,14 @@ const patientNav = [
     { to: "/log", label: "Log Symptoms", icon: PenLine },
     { to: "/history", label: "History", icon: Clock },
     { to: "/milestones", label: "Milestones", icon: Trophy },
+    { to: "/chat", label: "Chat", icon: MessageSquare },
     { to: "/requests", label: "Connections", icon: UserPlus },
 ];
 
 const doctorNav = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/patients", label: "Patients", icon: Users },
+    { to: "/chat", label: "Chat", icon: MessageSquare },
     { to: "/requests", label: "Requests", icon: UserPlus },
 ];
 

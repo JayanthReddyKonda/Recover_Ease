@@ -1,8 +1,15 @@
 import api from "./axios";
-import type { ApiResponse, DoctorLink, RequestResponse, SafeUser } from "@/types";
+import type { ApiResponse, DoctorLink, MedicationInput, RequestResponse, SafeUser } from "@/types";
 
 export const requestApi = {
-    sendRequest: (payload: { to_email?: string; connect_code?: string; specialty?: string }) =>
+    sendRequest: (payload: {
+        to_email?: string;
+        connect_code?: string;
+        specialty?: string;
+        visit_date?: string;
+        disease_description: string;
+        medications: MedicationInput[];
+    }) =>
         api
             .post<ApiResponse<RequestResponse>>("/requests", payload)
             .then((r) => r.data),

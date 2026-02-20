@@ -4,24 +4,25 @@ import {
     LayoutDashboard,
     PenLine,
     Clock,
-    Trophy,
     User,
     Users,
     UserPlus,
+    MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const patientTabs = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { to: "/log", icon: PenLine, label: "Log" },
+    { to: "/chat", icon: MessageSquare, label: "Chat" },
     { to: "/history", icon: Clock, label: "History" },
-    { to: "/milestones", icon: Trophy, label: "Awards" },
     { to: "/profile", icon: User, label: "Profile" },
 ];
 
 const doctorTabs = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Home" },
     { to: "/patients", icon: Users, label: "Patients" },
+    { to: "/chat", icon: MessageSquare, label: "Chat" },
     { to: "/requests", icon: UserPlus, label: "Requests" },
     { to: "/profile", icon: User, label: "Profile" },
 ];

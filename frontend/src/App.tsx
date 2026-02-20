@@ -19,6 +19,7 @@ const RequestsPage = lazy(() => import("@/pages/RequestsPage"));
 const PatientsListPage = lazy(() => import("@/pages/PatientsListPage"));
 const PatientDetailPage = lazy(() => import("@/pages/PatientDetailPage"));
 const SOSPage = lazy(() => import("@/pages/SOSPage"));
+const ChatPage = lazy(() => import("@/pages/ChatPage"));
 const NotFoundPage = lazy(() => import("@/pages/NotFoundPage"));
 
 function PageLoader() {
@@ -65,6 +66,7 @@ export default function App() {
                         <Route path="/dashboard" element={<DashboardRouter />} />
                         <Route path="/profile" element={<ProfilePage />} />
                         <Route path="/requests" element={<RequestsPage />} />
+                        <Route path="/chat" element={<ChatPage />} />
                     </Route>
 
                     {/* 404 */}

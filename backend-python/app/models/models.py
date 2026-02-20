@@ -38,6 +38,12 @@ class Role(str, enum.Enum):
     DOCTOR = "DOCTOR"
 
 
+class ChatSessionStatus(str, enum.Enum):
+    REQUESTED = "REQUESTED"   # patient requested chat with a past (inactive) doctor
+    ACTIVE = "ACTIVE"         # both parties can exchange messages
+    CLOSED = "CLOSED"
+
+
 class RequestStatus(str, enum.Enum):
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
@@ -178,6 +184,15 @@ class DoctorPatientRequest(Base):
         Enum(RequestStatus), default=RequestStatus.PENDING, nullable=False
     )
 
+    # ── Clinical context filled by the doctor when sending the request ──
+    specialty: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    visit_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disease_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # List of {name, dosage, frequency, time_of_day} dicts
+    medications: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # AI-structured care plan built from the above fields
+    ai_structured_plan: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     from_user: Mapped[User] = relationship("User", foreign_keys=[from_id], back_populates="sent_requests", lazy="selectin")
@@ -278,3 +293,70 @@ class Milestone(Base):
     earned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     patient: Mapped[User] = relationship("User", back_populates="milestones", lazy="selectin")
+
+
+# ── ChatSession ─────────────────────────────────────
+
+class ChatSession(Base):
+    """A conversation thread between a patient and a doctor (or AI)."""
+    __tablename__ = "chat_sessions"
+    __table_args__ = (
+        Index("ix_chat_session_patient", "patient_id"),
+        Index("ix_chat_session_doctor", "doctor_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # null = AI-only session
+    doctor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[ChatSessionStatus] = mapped_column(
+        Enum(ChatSessionStatus), default=ChatSessionStatus.ACTIVE, nullable=False
+    )
+    # title shown in the sidebar (e.g. "Dr. Smith — Orthopedics" or "AI Assistant")
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="Chat")
+    # True → was opened by the patient as a re-connect request to a past (inactive) doctor
+    is_request: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+    patient: Mapped[User] = relationship("User", foreign_keys=[patient_id], lazy="selectin")
+    doctor: Mapped[User | None] = relationship("User", foreign_keys=[doctor_id], lazy="selectin")
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan", lazy="selectin",
+        order_by="ChatMessage.created_at"
+    )
+
+
+# ── ChatMessage ─────────────────────────────────────
+
+class ChatMessage(Base):
+    """A single message inside a ChatSession."""
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("ix_chat_message_session", "session_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    # null sender = AI message
+    sender_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    is_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # voice_transcript = True if this message came from the voice input feature
+    is_voice: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    session: Mapped[ChatSession] = relationship(back_populates="messages", lazy="selectin")
+    sender: Mapped[User | None] = relationship("User", foreign_keys=[sender_id], lazy="selectin")
