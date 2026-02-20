@@ -3,7 +3,7 @@ import { io, Socket } from "socket.io-client";
 import { useStore } from "@/store/useStore";
 import type { MilestoneEarnedEvent, PatientAlertEvent } from "@/types";
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || undefined;
 
 /**
  * Manages a single Socket.IO connection scoped to the authenticated user.
@@ -16,7 +16,7 @@ export function useSocket() {
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
-        if (!user || !token || !SOCKET_URL) return;
+        if (!user || !token) return;
 
         const socket = io(SOCKET_URL, {
             auth: { token },
@@ -28,9 +28,11 @@ export function useSocket() {
         socket.on("connect", () => {
             setConnected(true);
             // Ask server to join the correct room
-            const room =
-                user.role === "DOCTOR" ? `doctor:${user.id}` : `patient:${user.id}`;
-            socket.emit("join", { room });
+            if (user.role === "DOCTOR") {
+                socket.emit("join_doctor_room", { doctor_id: user.id });
+            } else {
+                socket.emit("join_patient_room", { patient_id: user.id });
+            }
         });
 
         socket.on("disconnect", () => setConnected(false));

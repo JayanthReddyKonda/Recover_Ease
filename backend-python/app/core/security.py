@@ -33,12 +33,8 @@ def create_access_token(user_id: str, role: str) -> str:
 
 def decode_access_token(token: str) -> dict:
     """Decode and verify a JWT. Raises JWTError on failure."""
-    try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm],
-        )
-        return payload
-    except JWTError:
-        raise
+    return jwt.decode(
+        token,
+        settings.jwt_secret,
+        algorithms=[settings.jwt_algorithm],
+    )

@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # -- Server --
     port: int = 8000
     cors_origin: str = "*"
-    node_env: str = "development"
+    node_env: str = "production"
 
     @property
     def is_production(self) -> bool:

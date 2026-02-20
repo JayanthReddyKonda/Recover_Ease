@@ -28,7 +28,7 @@ async def send_request(db: AsyncSession, from_user: User, to_email: str) -> Doct
     if from_user.role == to_user.role:
         raise AppError("Both users have the same role — need doctor + patient", 400)
 
-    # Check for existing request
+    # Check for existing request in either direction
     existing = await db.execute(
         select(DoctorPatientRequest).where(
             and_(
@@ -39,6 +39,17 @@ async def send_request(db: AsyncSession, from_user: User, to_email: str) -> Doct
     )
     if existing.scalar_one_or_none():
         raise AppError("Request already exists", 409)
+
+    reverse = await db.execute(
+        select(DoctorPatientRequest).where(
+            and_(
+                DoctorPatientRequest.from_id == to_user.id,
+                DoctorPatientRequest.to_id == from_user.id,
+            )
+        )
+    )
+    if reverse.scalar_one_or_none():
+        raise AppError("A request from this user already exists", 409)
 
     req = DoctorPatientRequest(
         from_id=from_user.id,

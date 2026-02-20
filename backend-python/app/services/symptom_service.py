@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logger import logger
 from app.models.models import SymptomLog
 from app.schemas.symptom import LogSymptomRequest
-from app.services import escalation_service, groq_service, recovery_service
+from app.services import email_service, escalation_service, groq_service, recovery_service
 
 
 async def log_symptoms(
@@ -69,23 +69,47 @@ async def log_symptoms(
     log_count = log_count_result.scalar() or 0
     new_milestones = await recovery_service.check_and_award_milestones(db, patient_id, log_count)
 
-    # Real-time notifications via Socket.io
-    if sio and escalation:
+    # Real-time + email notifications on escalation
+    if escalation:
         from app.models.models import User
         patient_result = await db.execute(select(User).where(User.id == patient_id))
         patient = patient_result.scalar_one_or_none()
         if patient and patient.doctor_id:
-            await sio.emit(
-                "patient_alert",
-                {
-                    "type": "escalation",
-                    "patient_id": str(patient_id),
-                    "patient_name": patient.name,
-                    "severity": escalation.severity.value,
-                    "is_sos": escalation.is_sos,
-                },
-                room=f"doctor:{patient.doctor_id}",
+            # Send email to doctor
+            doctor_result = await db.execute(
+                select(User).where(User.id == patient.doctor_id)
             )
+            doctor = doctor_result.scalar_one_or_none()
+            if doctor:
+                await email_service.send_caregiver_alert(
+                    doctor.email,
+                    patient.name,
+                    escalation.severity.value,
+                    f"Escalation triggered — {escalation.severity.value} severity",
+                )
+
+            # Send email to caregiver
+            if patient.caregiver_email:
+                await email_service.send_caregiver_alert(
+                    patient.caregiver_email,
+                    patient.name,
+                    escalation.severity.value,
+                    f"Escalation triggered — {escalation.severity.value} severity",
+                )
+
+            # Socket.io real-time alert
+            if sio:
+                await sio.emit(
+                    "patient_alert",
+                    {
+                        "type": "escalation",
+                        "patient_id": str(patient_id),
+                        "patient_name": patient.name,
+                        "severity": escalation.severity.value,
+                        "is_sos": escalation.is_sos,
+                    },
+                    room=f"doctor:{patient.doctor_id}",
+                )
 
     if sio and new_milestones:
         await sio.emit(
