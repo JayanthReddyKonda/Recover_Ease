@@ -14,7 +14,7 @@ import Badge from "@/components/Badge";
 import Modal from "@/components/Modal";
 import { PageTransition } from "@/components/motion";
 import { useState } from "react";
-import { User, Link2, Unlink, Hash } from "lucide-react";
+import { Link2, Unlink, Hash } from "lucide-react";
 import type { DoctorLink, ProfileUpdateRequest } from "@/types";
 
 const profileSchema = z.object({
@@ -81,44 +81,43 @@ export default function ProfilePage() {
                 <h1 className="page-heading">Profile</h1>
 
                 {/* Info card */}
-                <Card className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-100 to-primary-200 text-primary-600">
-                        <User className="h-7 w-7" />
+                <div className="relative overflow-hidden rounded-2xl p-5 flex items-center gap-4" style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%)", boxShadow: "0 8px 32px rgb(79 70 229 / 0.25)" }}>
+                    <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "repeating-linear-gradient(0deg,transparent,transparent 24px,rgba(255,255,255,1) 24px,rgba(255,255,255,1) 25px),repeating-linear-gradient(90deg,transparent,transparent 24px,rgba(255,255,255,1) 24px,rgba(255,255,255,1) 25px)" }} />
+                    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-white text-xl font-bold" style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+                        {user?.name?.charAt(0)?.toUpperCase()}
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-lg font-bold text-gray-900 truncate">{user?.name}</p>
-                        <p className="text-sm text-gray-500 truncate">{user?.email}</p>
-                        <Badge variant={user?.role === "DOCTOR" ? "normal" : "recovering"} className="mt-1.5">
-                            {user?.role}
-                        </Badge>
+                    <div className="relative min-w-0 flex-1">
+                        <p className="text-lg font-bold text-white truncate">{user?.name}</p>
+                        <p className="text-sm text-white/60 truncate">{user?.email}</p>
+                        <span className="mt-1.5 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-semibold text-white/90">{user?.role}</span>
                     </div>
-                </Card>
+                </div>
 
                 {/* Connect code (for both roles) */}
                 {user?.connect_code && (
-                    <Card>
-                        <h2 className="section-heading mb-2 flex items-center gap-1">
-                            <Hash className="h-4 w-4" /> Your Connect Code
-                        </h2>
-                        <p className="text-xs text-gray-500 mb-3">
-                            Share this code so others can send you connection requests without knowing your email.
-                        </p>
+                    <div className="relative overflow-hidden rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #0f172a, #1e1b4b)", border: "1px solid rgba(99,102,241,0.25)", boxShadow: "0 4px 20px rgb(79 70 229 / 0.15)" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Hash className="h-4 w-4 text-indigo-400" />
+                            <h2 className="text-sm font-semibold text-white/80">Your Connect Code</h2>
+                        </div>
+                        <p className="text-xs text-white/35 mb-4">Share this code so others can send you connection requests.</p>
                         <div className="flex items-center gap-3">
-                            <span className="rounded-xl bg-primary-50 px-5 py-2.5 text-2xl font-mono font-bold tracking-widest text-primary-700 border border-primary-200 select-all">
+                            <span className="rounded-xl px-5 py-3 text-2xl font-mono font-bold tracking-widest text-indigo-300 select-all" style={{ background: "rgba(99,102,241,0.12)", border: "1px solid rgba(99,102,241,0.3)", letterSpacing: "0.25em" }}>
                                 {user.connect_code}
                             </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
+                            <button
+                                type="button"
+                                className="rounded-xl px-3 py-2 text-xs font-semibold text-white/70 hover:text-white transition-colors"
+                                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
                                 onClick={() => {
                                     navigator.clipboard.writeText(user.connect_code);
                                     addToast("success", "Copied", "Connect code copied to clipboard");
                                 }}
                             >
                                 Copy
-                            </Button>
+                            </button>
                         </div>
-                    </Card>
+                    </div>
                 )}
 
                 {/* Edit form */}

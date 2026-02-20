@@ -57,35 +57,41 @@ export default function PatientDashboard() {
     return (
         <PageTransition>
             <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <h1 className="page-heading">
-                            Good {getTimeOfDay()}, {user?.name?.split(" ")[0]}
-                        </h1>
-                        {surgeryDay !== null && (
-                            <p className="mt-1 text-sm text-gray-500">
-                                Day <span className="font-semibold text-primary-600">{surgeryDay}</span> of recovery
-                                {user?.surgery_type && ` — ${user.surgery_type}`}
+                {/* ── Hero Header ── */}
+                <div className="relative overflow-hidden rounded-2xl p-6 text-white" style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4f46e5 100%)", boxShadow: "0 8px 32px rgb(79 70 229 / 0.25)" }}>
+                    <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full opacity-20" style={{ background: "radial-gradient(circle, #a78bfa 0%, transparent 70%)", filter: "blur(20px)" }} />
+                    <div className="absolute right-2 bottom-0 h-28 w-28 rounded-full opacity-10" style={{ background: "radial-gradient(circle, #818cf8 0%, transparent 70%)", filter: "blur(16px)" }} />
+                    <div className="relative flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-1">
+                                Good {getTimeOfDay()}
                             </p>
-                        )}
+                            <h1 className="text-2xl font-extrabold tracking-tight">
+                                {user?.name?.split(" ")[0]}
+                            </h1>
+                            {surgeryDay !== null && (
+                                <p className="mt-1 text-sm text-white/60">
+                                    Day <span className="font-bold text-white">{surgeryDay}</span> of recovery
+                                    {user?.surgery_type && ` — ${user.surgery_type}`}
+                                </p>
+                            )}
+                        </div>
+                        <Link to="/log">
+                            <button className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-white/15 border border-white/20">
+                                Log Today
+                            </button>
+                        </Link>
                     </div>
-                    <Link to="/log">
-                        <Button>Log Today</Button>
-                    </Link>
                 </div>
 
                 {/* Recovery stage */}
                 {profile.data?.recovery_stage && (
-                    <Card className="bg-gradient-to-br from-primary-600 to-primary-800 text-white border-0 shadow-glow-sm">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-primary-200">
-                            Recovery Stage
-                        </p>
-                        <p className="mt-1.5 text-2xl font-bold">{profile.data.recovery_stage.name}</p>
-                        <p className="mt-1 text-sm text-primary-100">
-                            {profile.data.recovery_stage.description}
-                        </p>
-                    </Card>
+                    <div className="relative overflow-hidden rounded-2xl p-5" style={{ background: "linear-gradient(135deg, #0f2027, #203a43, #2c5364)", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 4px 24px rgb(0 0 0 / 0.15)" }}>
+                        <div className="absolute right-4 top-4 opacity-10" style={{ fontSize: "64px" }}>🏥</div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Recovery Stage</p>
+                        <p className="mt-1.5 text-xl font-bold text-white">{profile.data.recovery_stage.name}</p>
+                        <p className="mt-1 text-sm text-white/55">{profile.data.recovery_stage.description}</p>
+                    </div>
                 )}
 
                 {/* Metric cards */}
@@ -150,8 +156,8 @@ export default function PatientDashboard() {
 
                 {/* AI Insight */}
                 <Card>
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-pink-400 text-white">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #ec4899)", boxShadow: "0 4px 12px rgb(124 58 237 / 0.35)" }}>
                             <Brain className="h-4 w-4" />
                         </div>
                         <h2 className="section-heading">AI Insight</h2>
@@ -160,24 +166,24 @@ export default function PatientDashboard() {
                         <Skeleton lines={4} />
                     ) : insight.data ? (
                         <div className="space-y-3 text-sm">
-                            <p>{insight.data.summary}</p>
+                            <p className="text-gray-700 leading-relaxed">{insight.data.summary}</p>
                             {insight.data.tips.length > 0 && (
-                                <div>
-                                    <p className="font-medium text-gray-700">Tips</p>
-                                    <ul className="ml-4 list-disc text-gray-600">
-                                        {insight.data.tips.map((t, i) => (<li key={i}>{t}</li>))}
+                                <div className="rounded-xl bg-blue-50/60 p-3.5">
+                                    <p className="text-[12px] font-semibold uppercase tracking-wider text-blue-600 mb-2">Tips</p>
+                                    <ul className="space-y-1 text-gray-700">
+                                        {insight.data.tips.map((t, i) => (<li key={i} className="flex gap-2"><span className="text-blue-400 shrink-0">•</span>{t}</li>))}
                                     </ul>
                                 </div>
                             )}
                             {insight.data.warning_signs.length > 0 && (
-                                <div>
-                                    <p className="font-medium text-red-600">Warning Signs</p>
-                                    <ul className="ml-4 list-disc text-red-500">
-                                        {insight.data.warning_signs.map((w, i) => (<li key={i}>{w}</li>))}
+                                <div className="rounded-xl bg-red-50/60 p-3.5">
+                                    <p className="text-[12px] font-semibold uppercase tracking-wider text-red-600 mb-2">Warning Signs</p>
+                                    <ul className="space-y-1 text-red-700">
+                                        {insight.data.warning_signs.map((w, i) => (<li key={i} className="flex gap-2"><span className="shrink-0">⚠️</span>{w}</li>))}
                                     </ul>
                                 </div>
                             )}
-                            <p className="italic text-emerald-600">{insight.data.encouragement}</p>
+                            <p className="italic text-emerald-600 font-medium">{insight.data.encouragement}</p>
                         </div>
                     ) : (
                         <p className="text-sm text-gray-400">Log symptoms to get AI insights.</p>

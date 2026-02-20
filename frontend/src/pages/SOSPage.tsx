@@ -25,26 +25,38 @@ export default function SOSPage() {
 
     return (
         <PageTransition>
-            <div className="mx-auto max-w-md space-y-6 pt-10">
-                <Card className="text-center border-red-100">
-                    <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-red-50">
-                        <AlertTriangle className="h-10 w-10 text-red-500" />
+            <div className="mx-auto max-w-md space-y-6 pt-6">
+                {/* Main SOS Card */}
+                <div className="relative overflow-hidden rounded-2xl p-8 text-center" style={{ background: "linear-gradient(145deg, #2d0a0a, #450f0f, #7f1d1d)", boxShadow: "0 0 64px rgb(220 38 38 / 0.25), 0 8px 32px rgb(0 0 0 / 0.3)", border: "1px solid rgba(239,68,68,0.2)" }}>
+                    {/* Pulsing background glow */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="h-64 w-64 rounded-full bg-red-600 opacity-10 animate-pulse" style={{ filter: "blur(60px)" }} />
                     </div>
-                    <h1 className="mt-5 text-2xl font-bold text-red-600">Emergency SOS</h1>
-                    <p className="mt-2 text-sm leading-relaxed text-gray-500">
-                        Use this if you&apos;re experiencing severe symptoms and need immediate
-                        attention from your doctor.
-                    </p>
 
-                    <Button
-                        variant="danger"
-                        size="lg"
-                        className="mt-6 w-full shadow-glow-red"
-                        onClick={() => setShowConfirm(true)}
-                    >
-                        Send SOS Alert
-                    </Button>
-                </Card>
+                    <div className="relative">
+                        <div className="relative mx-auto mb-5 flex h-24 w-24 items-center justify-center">
+                            <div className="absolute inset-0 rounded-full bg-red-500 opacity-20 animate-ping" style={{ animationDuration: "2s" }} />
+                            <div className="absolute inset-2 rounded-full bg-red-500 opacity-15 animate-ping" style={{ animationDuration: "2s", animationDelay: "0.3s" }} />
+                            <div className="relative flex h-20 w-20 items-center justify-center rounded-full" style={{ background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                                <AlertTriangle className="h-9 w-9 text-red-400" />
+                            </div>
+                        </div>
+
+                        <h1 className="text-2xl font-black text-white tracking-tight">Emergency SOS</h1>
+                        <p className="mt-3 text-sm leading-relaxed text-red-200/60">
+                            Use this if you&apos;re experiencing severe symptoms and need
+                            immediate attention from your doctor.
+                        </p>
+
+                        <button
+                            className="mt-8 w-full rounded-2xl py-4 text-[15px] font-bold text-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", boxShadow: "0 0 32px rgb(239 68 68 / 0.5), 0 4px 16px rgb(0 0 0 / 0.3)" }}
+                            onClick={() => setShowConfirm(true)}
+                        >
+                            Send SOS Alert
+                        </button>
+                    </div>
+                </div>
 
                 <Modal
                     open={showConfirm}

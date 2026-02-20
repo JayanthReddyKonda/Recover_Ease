@@ -48,43 +48,53 @@ export default function PatientsListPage() {
                     </div>
                 ) : patients.data && patients.data.length > 0 ? (
                     <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {patients.data.map((p) => (
-                            <StaggerItem key={p.id}>
-                                <Card hoverable>
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
-                                            <span className="text-sm font-bold">{p.name?.charAt(0)?.toUpperCase()}</span>
+                        {patients.data.map((p, idx) => {
+                            const gradients = [
+                                "linear-gradient(135deg,#4f46e5,#7c3aed)",
+                                "linear-gradient(135deg,#0ea5e9,#6366f1)",
+                                "linear-gradient(135deg,#10b981,#0ea5e9)",
+                                "linear-gradient(135deg,#f59e0b,#ef4444)",
+                                "linear-gradient(135deg,#ec4899,#8b5cf6)",
+                            ];
+                            const grad = gradients[idx % gradients.length];
+                            return (
+                                <StaggerItem key={p.id}>
+                                    <Card hoverable className="group">
+                                        <div className="flex items-start justify-between mb-4">
+                                            <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white text-sm font-bold shadow-md" style={{ background: grad }}>
+                                                {p.name?.charAt(0)?.toUpperCase()}
+                                            </div>
+                                            <Badge variant={p.is_active ? "recovering" : "normal"}>
+                                                {p.is_active ? "In Treatment" : "Recovered"}
+                                            </Badge>
                                         </div>
-                                        <Badge variant={p.is_active ? "recovering" : "normal"}>
-                                            {p.is_active ? "In Treatment" : "Recovered"}
-                                        </Badge>
-                                    </div>
-                                    <p className="font-semibold text-gray-900">{p.name}</p>
-                                    <p className="text-xs text-gray-400 truncate">{p.email}</p>
-                                    {p.surgery_type && (
-                                        <p className="mt-1.5 text-xs text-gray-500">{p.surgery_type}</p>
-                                    )}
-                                    <div className="mt-4 flex gap-2">
-                                        <Link to={`/patients/${p.id}`} className="flex-1">
-                                            <Button size="sm" variant="outline" className="w-full">
-                                                View Details
+                                        <p className="font-semibold text-gray-900">{p.name}</p>
+                                        <p className="text-xs text-gray-400 truncate mt-0.5">{p.email}</p>
+                                        {p.surgery_type && (
+                                            <p className="mt-2 inline-block rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500">{p.surgery_type}</p>
+                                        )}
+                                        <div className="mt-4 flex gap-2">
+                                            <Link to={`/patients/${p.id}`} className="flex-1">
+                                                <Button size="sm" variant="outline" className="w-full">
+                                                    View Details
+                                                </Button>
+                                            </Link>
+                                            <Button
+                                                size="sm"
+                                                variant={p.is_active ? "ghost" : "primary"}
+                                                loading={toggleMut.isPending}
+                                                onClick={() =>
+                                                    toggleMut.mutate({ patientId: p.id, isActive: !p.is_active })
+                                                }
+                                                title={p.is_active ? "Mark as Recovered" : "Mark back In Treatment"}
+                                            >
+                                                {p.is_active ? "Recovered ✓" : "In Treatment"}
                                             </Button>
-                                        </Link>
-                                        <Button
-                                            size="sm"
-                                            variant={p.is_active ? "ghost" : "primary"}
-                                            loading={toggleMut.isPending}
-                                            onClick={() =>
-                                                toggleMut.mutate({ patientId: p.id, isActive: !p.is_active })
-                                            }
-                                            title={p.is_active ? "Mark as Recovered" : "Mark back In Treatment"}
-                                        >
-                                            {p.is_active ? "Recovered ✓" : "In Treatment"}
-                                        </Button>
-                                    </div>
-                                </Card>
-                            </StaggerItem>
-                        ))}
+                                        </div>
+                                    </Card>
+                                </StaggerItem>
+                            )
+                        })}
                     </Stagger>
                 ) : (
                     <Card className="py-16 text-center">

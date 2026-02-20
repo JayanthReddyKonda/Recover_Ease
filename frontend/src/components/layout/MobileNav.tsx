@@ -32,8 +32,8 @@ export default function MobileNav() {
     const tabs = user?.role === "DOCTOR" ? doctorTabs : patientTabs;
 
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200/60 bg-white/90 backdrop-blur-xl lg:hidden safe-area-bottom">
-            <div className="mx-auto flex max-w-lg items-center justify-around">
+        <nav className="fixed inset-x-0 bottom-0 z-40 lg:hidden safe-area-bottom" style={{ background: "linear-gradient(to top, #0d1117f8, #111520f0)", backdropFilter: "blur(24px)", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <div className="mx-auto flex max-w-lg items-center">
                 {tabs.map((tab) => {
                     const isActive = location.pathname === tab.to;
                     return (
@@ -41,22 +41,15 @@ export default function MobileNav() {
                             key={tab.to}
                             to={tab.to}
                             className={cn(
-                                "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
-                                isActive
-                                    ? "text-primary-600"
-                                    : "text-gray-400 active:text-gray-600",
+                                "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition-all duration-200",
+                                isActive ? "text-primary-300" : "text-white/30 active:text-white/60"
                             )}
                         >
-                            <tab.icon
-                                className={cn(
-                                    "h-5 w-5 transition-colors",
-                                    isActive && "text-primary-600",
-                                )}
-                            />
-                            <span>{tab.label}</span>
                             {isActive && (
-                                <span className="absolute top-0 h-0.5 w-8 rounded-full bg-primary-600" />
+                                <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-6 rounded-full" style={{ background: "linear-gradient(90deg, #6366f1, #a78bfa)" }} />
                             )}
+                            <tab.icon className={cn("h-5 w-5 transition-all", isActive && "scale-110")} />
+                            <span>{tab.label}</span>
                         </Link>
                     );
                 })}

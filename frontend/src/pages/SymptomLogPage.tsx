@@ -104,21 +104,32 @@ export default function SymptomLogPage() {
         return (
             <PageTransition>
                 <div className="mx-auto max-w-lg space-y-6">
-                    <Card className="text-center">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
-                            <CheckCircle className="h-7 w-7 text-emerald-500" />
+                    <div className="relative overflow-hidden rounded-2xl p-6 text-center" style={{ background: "linear-gradient(135deg, #052e16, #064e3b, #065f46)", border: "1px solid rgba(16,185,129,0.2)", boxShadow: "0 8px 32px rgb(16 185 129 / 0.15)" }}>
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "rgba(16,185,129,0.2)", border: "1px solid rgba(16,185,129,0.3)", boxShadow: "0 0 24px rgb(16 185 129 / 0.3)" }}>
+                            <CheckCircle className="h-8 w-8 text-emerald-400" />
                         </div>
-                        <h2 className="mt-4 text-lg font-bold text-gray-900">Already Logged Today</h2>
-                        <p className="mt-1 text-sm text-gray-500">
-                            Pain {todayLog.data.pain_level}/10 · Mood {todayLog.data.mood}/10 · Energy {todayLog.data.energy}/10
-                        </p>
+                        <h2 className="mt-4 text-xl font-bold text-white">Already Logged Today</h2>
+                        <div className="mt-3 flex justify-center gap-4">
+                            <div className="rounded-xl bg-white/5 px-3 py-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">Pain</p>
+                                <p className="text-lg font-bold text-white">{todayLog.data.pain_level}<span className="text-sm text-white/40">/10</span></p>
+                            </div>
+                            <div className="rounded-xl bg-white/5 px-3 py-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">Mood</p>
+                                <p className="text-lg font-bold text-white">{todayLog.data.mood}<span className="text-sm text-white/40">/10</span></p>
+                            </div>
+                            <div className="rounded-xl bg-white/5 px-3 py-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/70">Energy</p>
+                                <p className="text-lg font-bold text-white">{todayLog.data.energy}<span className="text-sm text-white/40">/10</span></p>
+                            </div>
+                        </div>
                         {todayLog.data.ai_insight && (
-                            <div className="mt-4 rounded-xl bg-blue-50 p-4 text-left text-sm text-blue-800">
-                                <p className="font-semibold">AI Insight</p>
-                                <p className="mt-1 text-blue-700">{todayLog.data.ai_insight.summary}</p>
+                            <div className="mt-4 rounded-xl bg-white/5 p-4 text-left" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400 mb-1">AI Insight</p>
+                                <p className="text-sm text-white/70">{todayLog.data.ai_insight.summary}</p>
                             </div>
                         )}
-                    </Card>
+                    </div>
                 </div>
             </PageTransition>
         );
