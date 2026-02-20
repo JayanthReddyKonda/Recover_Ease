@@ -89,6 +89,8 @@ services:
     command: http backend:8000 --url=${NGROK_DOMAIN:-sun-unupset-pursuingly.ngrok-free.dev} --log=stdout
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    ports:
+      - "4040:4040"
     depends_on:
       backend:
         condition: service_healthy
