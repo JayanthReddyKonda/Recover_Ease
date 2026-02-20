@@ -130,11 +130,20 @@ async def _handle_text_message(raw_phone: str, text: str, db: DbSession) -> None
         logger.info("whatsapp_unknown_patient", phone_prefix=phone[:6])
         return
 
-    # ── SOS keyword detection ────────────────────────────────
+    # ── SOS keyword detection ─────────────────────────────────────────────────
+    # Matches exact keywords OR any message that *starts with* one
+    # e.g. "sos" ✓  |  "SOS help I fell down" ✓  |  "emergency chest pain" ✓
     _SOS_KEYWORDS = {"sos", "help", "emergency", "urgent", "help me", "call doctor"}
-    if text.strip().lower() in _SOS_KEYWORDS:
-        notes = text if text.strip().lower() not in {"sos", "help", "emergency", "urgent"} else None
-        await patient_service.trigger_sos(db, patient, notes=notes, sio=None)
+    _text_lower = text.strip().lower()
+    _is_sos = _text_lower in _SOS_KEYWORDS or any(
+        _text_lower.startswith(kw + " ") or _text_lower.startswith(kw + ",")
+        for kw in _SOS_KEYWORDS
+    )
+    if _is_sos:
+        # Always pass the full message text as notes so the doctor sees exactly
+        # what the patient wrote (e.g. "SOS help I fell down the stairs")
+        sos_notes = text.strip()
+        await patient_service.trigger_sos(db, patient, notes=sos_notes, sio=None)
         await whatsapp_service.send_text(
             phone,
             (
@@ -143,7 +152,7 @@ async def _handle_text_message(raw_phone: str, text: str, db: DbSession) -> None
                 "Stay calm — help is on the way. 💙"
             ),
         )
-        logger.info("whatsapp_sos_triggered", patient_id=str(patient.id))
+        logger.info("whatsapp_sos_triggered", patient_id=str(patient.id), notes_preview=sos_notes[:60])
         return
 
     # ── Parse free-text message with Groq ─────────────────────────
