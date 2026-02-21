@@ -33,6 +33,8 @@ class SessionOut(BaseModel):
     updated_at: datetime
     last_message: str | None = None
     unread: int = 0
+    patient_name: str | None = None
+    doctor_name: str | None = None
 
     model_config = {"from_attributes": True}
 

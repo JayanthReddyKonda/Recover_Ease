@@ -147,7 +147,15 @@ function SessionItem({
     isSelected: boolean;
     onClick: () => void;
 }) {
+    const { user } = useAuth();
     const isAI = !session.doctor_id;
+    // Doctors see the patient's name; patients see the doctor's name (stored in title)
+    const isDoctor = user?.role === "DOCTOR";
+    const displayTitle = isAI
+        ? session.title
+        : isDoctor
+            ? (session.patient_name ?? session.title)
+            : session.title;
     return (
         <button
             onClick={onClick}
@@ -166,11 +174,11 @@ function SessionItem({
                         : "linear-gradient(135deg, #0ea5e9, #6366f1)",
                 }}
             >
-                {isAI ? <Sparkles className="h-4 w-4" /> : session.title.charAt(session.title.indexOf(" ") + 1) || "D"}
+                {isAI ? <Sparkles className="h-4 w-4" /> : displayTitle.charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-800 truncate">{session.title}</p>
+                    <p className="text-sm font-semibold text-gray-800 truncate">{displayTitle}</p>
                     {session.status === "REQUESTED" && (
                         <span className="flex-shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-600">
                             Pending
@@ -311,6 +319,7 @@ function ChatThread({
 }) {
     const qc = useQueryClient();
     const addToast = useStore((s) => s.addToast);
+    const { user } = useAuth();
     const [text, setText] = useState("");
     const [interimText, setInterimText] = useState("");
     const [typingName, setTypingName] = useState<string | null>(null);
@@ -322,6 +331,12 @@ function ChatThread({
     const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isAI = !session.doctor_id;
     const isActive = session.status === "ACTIVE";
+    const isDoctor = user?.role === "DOCTOR";
+    const threadTitle = isAI
+        ? session.title
+        : isDoctor
+            ? (session.patient_name ?? session.title)
+            : session.title;
 
     const messages = useQuery({
         queryKey: ["chat-messages", session.id],
@@ -503,7 +518,7 @@ function ChatThread({
                     {isAI ? <Sparkles className="h-4 w-4" /> : <Stethoscope className="h-4 w-4" />}
                 </div>
                 <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">{session.title}</p>
+                    <p className="text-sm font-semibold text-gray-900">{threadTitle}</p>
                     <p className="text-[11px] text-gray-400">
                         {isAI ? "AI-powered recovery assistant" : session.status === "REQUESTED" ? "Pending approval" : "Active session"}
                     </p>

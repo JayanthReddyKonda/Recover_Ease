@@ -379,6 +379,8 @@ export interface ChatSession {
     updated_at: string;
     last_message: string | null;
     unread: number;
+    patient_name: string | null;
+    doctor_name: string | null;
 }
 
 // Socket event: new real-time message arrived

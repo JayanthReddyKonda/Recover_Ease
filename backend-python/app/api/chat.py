@@ -58,6 +58,8 @@ def _session_to_out(session: ChatSession) -> SessionOut:
         created_at=session.created_at,
         updated_at=session.updated_at,
         last_message=last,
+        patient_name=session.patient.name if session.patient else None,
+        doctor_name=session.doctor.name if session.doctor else None,
     )
 
 
