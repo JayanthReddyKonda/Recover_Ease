@@ -50,18 +50,23 @@ async def send_request(
     if to_user.role != Role.PATIENT:
         raise AppError("You can only send requests to patients", 400)
 
-    # Check for existing PENDING request
-    existing = await db.execute(
+    # Check for any existing request (any status) — unique constraint uq_from_to
+    # covers all statuses so we must handle all cases explicitly
+    existing_result = await db.execute(
         select(DoctorPatientRequest).where(
             and_(
                 DoctorPatientRequest.from_id == from_user.id,
                 DoctorPatientRequest.to_id == to_user.id,
-                DoctorPatientRequest.status == RequestStatus.PENDING,
             )
         )
     )
-    if existing.scalar_one_or_none():
-        raise AppError("Request already pending", 409)
+    existing_req = existing_result.scalar_one_or_none()
+    if existing_req:
+        if existing_req.status == RequestStatus.PENDING:
+            raise AppError("Request already pending for this patient", 409)
+        # ACCEPTED / REJECTED → delete the old record so a fresh one can be inserted
+        await db.delete(existing_req)
+        await db.flush()
 
     # Check already linked
     already = await db.execute(
